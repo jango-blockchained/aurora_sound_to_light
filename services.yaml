@@ -1,0 +1,96 @@
+create_effect:
+  name: Create Effect
+  description: Create a new custom light effect
+  fields:
+    name:
+      name: Name
+      description: Name of the custom effect
+      required: true
+      example: "My Custom Effect"
+      selector:
+        text:
+    code:
+      name: Code
+      description: Python code for the effect. Must set 'result' list with light states.
+      required: true
+      example: |
+        # Example: Simple color wave effect
+        for i in range(num_lights):
+            hue = (i / num_lights + parameters['phase']) % 1.0
+            rgb = tuple(int(x * 255) for x in colorsys.hsv_to_rgb(hue, 1.0, 1.0))
+            result.append({
+                'rgb_color': rgb,
+                'brightness': 255
+            })
+      selector:
+        text:
+          multiline: true
+    parameters:
+      name: Parameters
+      description: Effect parameters schema in JSON format
+      required: true
+      example: |
+        {
+          "phase": {
+            "type": "number",
+            "name": "Phase Offset",
+            "min": 0,
+            "max": 1,
+            "step": 0.1,
+            "default": 0
+          }
+        }
+      selector:
+        object:
+    description:
+      name: Description
+      description: Description of what the effect does
+      required: false
+      example: "Creates a smooth wave of colors across all lights"
+      selector:
+        text:
+
+update_effect:
+  name: Update Effect
+  description: Update an existing custom effect
+  fields:
+    effect_id:
+      name: Effect ID
+      description: ID of the effect to update
+      required: true
+      selector:
+        text:
+    code:
+      name: Code
+      description: New Python code for the effect
+      required: false
+      selector:
+        text:
+          multiline: true
+    parameters:
+      name: Parameters
+      description: New effect parameters schema
+      required: false
+      selector:
+        object:
+    description:
+      name: Description
+      description: New effect description
+      required: false
+      selector:
+        text:
+
+delete_effect:
+  name: Delete Effect
+  description: Delete a custom effect
+  fields:
+    effect_id:
+      name: Effect ID
+      description: ID of the effect to delete
+      required: true
+      selector:
+        text:
+
+list_effects:
+  name: List Effects
+  description: List all available effects (both built-in and custom) 

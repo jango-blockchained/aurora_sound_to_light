@@ -1,0 +1,17 @@
+{
+    "domain": "aurora_sound_to_light",
+    "name": "Aurora - Sound to Light",
+    "documentation": "https://github.com/yourusername/aurora-sound-to-light",
+    "issue_tracker": "https://github.com/yourusername/aurora-sound-to-light/issues",
+    "dependencies": [
+        "ffmpeg"
+    ],
+    "codeowners": [],
+    "requirements": [
+        "numpy>=1.21.0",
+        "pyaudio>=0.2.11"
+    ],
+    "iot_class": "local_push",
+    "version": "1.0.0",
+    "config_flow": true
+}

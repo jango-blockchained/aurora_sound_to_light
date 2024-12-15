@@ -1,0 +1,59 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Aurora Sound to Light Setup",
+                "description": "Configure your sound-reactive lighting system",
+                "data": {
+                    "audio_input_selection": "Audio Input Source",
+                    "buffer_size": "Audio Buffer Size (ms)",
+                    "latency_threshold": "Maximum Latency (ms)"
+                }
+            },
+            "media_player": {
+                "title": "Media Player Selection",
+                "description": "Select the media player to capture audio from",
+                "data": {
+                    "media_player": "Media Player"
+                }
+            },
+            "agc": {
+                "title": "Automatic Gain Control Setup",
+                "description": "Configure automatic gain control settings for consistent audio levels",
+                "data": {
+                    "agc_enabled": "Enable Automatic Gain Control",
+                    "agc_target": "Target RMS Level (0.01-0.5)",
+                    "agc_attack": "Attack Rate - Speed of gain increase",
+                    "agc_decay": "Decay Rate - Speed of gain decrease",
+                    "agc_noise_gate": "Noise Gate Threshold - Minimum level to process"
+                }
+            }
+        },
+        "error": {
+            "unknown": "Unexpected error occurred",
+            "no_media_players": "No media players found in your system"
+        },
+        "abort": {
+            "already_configured": "Device is already configured",
+            "no_media_players": "No compatible media players found. Please add a media player first."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Aurora Sound to Light Options",
+                "data": {
+                    "buffer_size": "Audio Buffer Size (ms)",
+                    "latency_threshold": "Maximum Latency (ms)",
+                    "frequency_bands": "Number of Frequency Bands",
+                    "transition_speed": "Effect Transition Speed (ms)",
+                    "agc_enabled": "Enable Automatic Gain Control",
+                    "agc_target": "Target RMS Level (0.01-0.5)",
+                    "agc_attack": "Attack Rate (0.0001-0.01)",
+                    "agc_decay": "Decay Rate (0.0001-0.01)",
+                    "agc_noise_gate": "Noise Gate Threshold (0.0001-0.1)"
+                }
+            }
+        }
+    }
+}
