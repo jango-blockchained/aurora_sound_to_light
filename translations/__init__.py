@@ -1,1 +1,1 @@
-"""Translations for Aurora Sound to Light.""" 
+"""Translations for Aurora Sound to Light."""

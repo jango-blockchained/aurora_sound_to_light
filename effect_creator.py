@@ -1,18 +1,23 @@
-"""Custom effect creator for Aurora Sound to Light."""
-from __future__ import annotations
-
-import logging
-import json
-import os
-import colorsys
+"""Effect creator for Aurora Sound to Light."""
 from typing import Any, Dict, List, Optional
-import voluptuous as vol
-
+import logging
+import colorsys
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import storage
 from homeassistant.util import slugify
+from homeassistant.helpers import storage
 
-from .const import DOMAIN
+from .const import (
+    DOMAIN,
+    PARAM_COLOR,
+    PARAM_SPEED,
+    PARAM_BRIGHTNESS,
+    PARAM_TRANSITION_TIME,
+    DEFAULT_COLOR,
+    DEFAULT_SPEED,
+    DEFAULT_BRIGHTNESS,
+    DEFAULT_TRANSITION_TIME,
+)
+from .effects.base_effect import BaseEffect
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,267 +26,144 @@ STORAGE_VERSION = 1
 
 # Effect parameter schemas
 PARAM_TYPES = {
-    "number": vol.Schema({
-        vol.Required("type"): "number",
-        vol.Required("name"): str,
-        vol.Required("min"): float,
-        vol.Required("max"): float,
-        vol.Required("step"): float,
-        vol.Required("default"): float,
-        vol.Optional("unit"): str,
-    }),
-    "color": vol.Schema({
-        vol.Required("type"): "color",
-        vol.Required("name"): str,
-        vol.Required("default"): (int, int, int),
-    }),
-    "boolean": vol.Schema({
-        vol.Required("type"): "boolean",
-        vol.Required("name"): str,
-        vol.Required("default"): bool,
-    }),
-    "select": vol.Schema({
-        vol.Required("type"): "select",
-        vol.Required("name"): str,
-        vol.Required("options"): [str],
-        vol.Required("default"): str,
-    }),
+    "number": {
+        "type": "number",
+        "name": str,
+        "min": float,
+        "max": float,
+        "step": float,
+        "default": float,
+        "unit": str,
+    },
+    "color": {
+        "type": "color",
+        "name": str,
+        "default": (int, int, int),
+    },
+    "boolean": {
+        "type": "boolean",
+        "name": str,
+        "default": bool,
+    },
+    "select": {
+        "type": "select",
+        "name": str,
+        "options": [str],
+        "default": str,
+    },
 }
 
-class CustomEffect:
-    """Represents a custom light effect."""
 
-    def __init__(
-        self,
-        name: str,
-        parameters: Dict[str, Any],
-        code: str,
-        description: Optional[str] = None,
-    ) -> None:
-        """Initialize the custom effect."""
-        self.name = name
-        self.id = slugify(name)
-        self.parameters = parameters
-        self.code = code
-        self.description = description or ""
-        self._compiled_code = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert effect to dictionary for storage."""
-        return {
-            "name": self.name,
-            "id": self.id,
-            "parameters": self.parameters,
-            "code": self.code,
-            "description": self.description,
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> CustomEffect:
-        """Create effect from dictionary."""
-        return cls(
-            name=data["name"],
-            parameters=data["parameters"],
-            code=data["code"],
-            description=data.get("description", ""),
-        )
-
-    def compile(self) -> None:
-        """Compile the effect code."""
-        try:
-            # Create a safe namespace for the effect code
-            namespace = {
-                'colorsys': colorsys,
-                'min': min,
-                'max': max,
-                'abs': abs,
-                'int': int,
-                'float': float,
-                'round': round,
-                'sum': sum,
-                'len': len,
-            }
-            # Compile the code
-            self._compiled_code = compile(self.code, f"<effect_{self.id}>", "exec")
-            return True
-        except Exception as err:
-            _LOGGER.error("Error compiling effect %s: %s", self.name, err)
-            return False
-
-    def execute(
-        self,
-        audio_data: Dict[str, Any],
-        parameters: Dict[str, Any],
-        num_lights: int,
-    ) -> List[Dict[str, Any]]:
-        """Execute the effect code with given parameters."""
-        if self._compiled_code is None and not self.compile():
-            return []
-
-        try:
-            # Create execution namespace
-            namespace = {
-                'audio_data': audio_data,
-                'parameters': parameters,
-                'num_lights': num_lights,
-                'result': [],
-                'colorsys': colorsys,
-                'min': min,
-                'max': max,
-                'abs': abs,
-                'int': int,
-                'float': float,
-                'round': round,
-                'sum': sum,
-                'len': len,
-            }
-
-            # Execute the code
-            exec(self._compiled_code, namespace)
-
-            # Get the result
-            result = namespace.get('result', [])
-            if not isinstance(result, list):
-                raise ValueError("Effect must return a list of light states")
-
-            # Validate result format
-            for state in result:
-                if not isinstance(state, dict):
-                    raise ValueError("Each light state must be a dictionary")
-                if 'brightness' in state and not isinstance(state['brightness'], (int, float)):
-                    raise ValueError("Brightness must be a number")
-                if 'rgb_color' in state and not isinstance(state['rgb_color'], (tuple, list)):
-                    raise ValueError("RGB color must be a tuple or list")
-
-            return result
-
-        except Exception as err:
-            _LOGGER.error("Error executing effect %s: %s", self.name, err)
-            return []
-
-
-class EffectManager:
-    """Manages custom effects storage and execution."""
+class EffectCreator:
+    """Create and manage custom effects."""
 
     def __init__(self, hass: HomeAssistant) -> None:
-        """Initialize the effect manager."""
+        """Initialize the effect creator."""
         self.hass = hass
-        self._store = storage.Store(hass, STORAGE_VERSION, STORAGE_KEY)
-        self._effects: Dict[str, CustomEffect] = {}
+        self._store = storage.Store(
+            hass,
+            STORAGE_VERSION,
+            STORAGE_KEY,
+            private=True,
+            atomic_writes=True
+        )
+        self._effects: Dict[str, BaseEffect] = {}
 
     async def async_load(self) -> None:
-        """Load effects from storage."""
-        data = await self._store.async_load()
-        if data:
-            for effect_data in data.get("effects", []):
-                effect = CustomEffect.from_dict(effect_data)
-                self._effects[effect.id] = effect
+        """Load saved effects."""
+        try:
+            data = await self._store.async_load()
+            if data:
+                for effect_data in data.get("effects", []):
+                    effect_id = slugify(effect_data["name"])
+                    self._effects[effect_id] = self._create_effect(
+                        effect_data["name"],
+                        effect_data["config"]
+                    )
+        except Exception as err:
+            _LOGGER.error("Failed to load effects: %s", err)
 
     async def async_save(self) -> None:
         """Save effects to storage."""
         data = {
-            "effects": [effect.to_dict() for effect in self._effects.values()]
+            "effects": [
+                {
+                    "name": effect.name,
+                    "config": effect.config,
+                }
+                for effect in self._effects.values()
+            ]
         }
         await self._store.async_save(data)
 
-    def get_effect(self, effect_id: str) -> Optional[CustomEffect]:
-        """Get effect by ID."""
-        return self._effects.get(effect_id)
-
-    def list_effects(self) -> List[Dict[str, Any]]:
-        """List all available effects."""
-        return [
-            {
-                "id": effect.id,
-                "name": effect.name,
-                "description": effect.description,
-                "parameters": effect.parameters,
-            }
-            for effect in self._effects.values()
-        ]
-
-    async def async_add_effect(
+    def _create_effect(
         self,
         name: str,
-        parameters: Dict[str, Any],
-        code: str,
-        description: Optional[str] = None,
-    ) -> Optional[str]:
-        """Add a new custom effect."""
-        # Validate parameters schema
+        config: Dict[str, Any]
+    ) -> BaseEffect:
+        """Create a new effect instance."""
         try:
-            for param_name, param_def in parameters.items():
-                param_type = param_def["type"]
+            # Validate parameters
+            for param_name, param_config in config.get("parameters", {}).items():
+                param_type = param_config.get("type")
                 if param_type not in PARAM_TYPES:
-                    raise ValueError(f"Invalid parameter type: {param_type}")
-                PARAM_TYPES[param_type](param_def)
+                    raise ValueError(
+                        f"Invalid parameter type '{param_type}' "
+                        f"for {param_name}"
+                    )
+                self._validate_param_config(param_type, param_config)
+
+            effect_class = self._create_effect_class(name, config)
+            return effect_class(self.hass, [], {})
+
         except Exception as err:
-            _LOGGER.error("Invalid parameters for effect %s: %s", name, err)
-            return None
+            _LOGGER.error("Failed to create effect: %s", err)
+            raise
 
-        # Create and test compile the effect
-        effect = CustomEffect(name, parameters, code, description)
-        if not effect.compile():
-            return None
-
-        # Add to storage
-        self._effects[effect.id] = effect
-        await self.async_save()
-        return effect.id
-
-    async def async_update_effect(
+    def _validate_param_config(
         self,
-        effect_id: str,
-        parameters: Optional[Dict[str, Any]] = None,
-        code: Optional[str] = None,
-        description: Optional[str] = None,
-    ) -> bool:
-        """Update an existing effect."""
-        effect = self.get_effect(effect_id)
-        if not effect:
-            return False
+        param_type: str,
+        config: Dict[str, Any]
+    ) -> None:
+        """Validate parameter configuration."""
+        schema = PARAM_TYPES[param_type]
+        for key, value_type in schema.items():
+            if key not in config:
+                if key == "unit":  # unit is optional
+                    continue
+                raise ValueError(f"Missing required field '{key}'")
+            if not isinstance(config[key], value_type):
+                raise ValueError(
+                    f"Invalid type for '{key}', expected {value_type}"
+                )
 
-        if parameters is not None:
-            # Validate new parameters
-            try:
-                for param_name, param_def in parameters.items():
-                    param_type = param_def["type"]
-                    if param_type not in PARAM_TYPES:
-                        raise ValueError(f"Invalid parameter type: {param_type}")
-                    PARAM_TYPES[param_type](param_def)
-                effect.parameters = parameters
-            except Exception as err:
-                _LOGGER.error("Invalid parameters for effect %s: %s", effect.name, err)
-                return False
-
-        if code is not None:
-            effect.code = code
-            if not effect.compile():
-                return False
-
-        if description is not None:
-            effect.description = description
-
-        await self.async_save()
-        return True
-
-    async def async_delete_effect(self, effect_id: str) -> bool:
-        """Delete an effect."""
-        if effect_id in self._effects:
-            del self._effects[effect_id]
-            await self.async_save()
-            return True
-        return False
-
-    def execute_effect(
+    def _create_effect_class(
         self,
-        effect_id: str,
-        audio_data: Dict[str, Any],
-        parameters: Dict[str, Any],
-        num_lights: int,
-    ) -> List[Dict[str, Any]]:
-        """Execute an effect with given parameters."""
-        effect = self.get_effect(effect_id)
-        if not effect:
-            return []
-        return effect.execute(audio_data, parameters, num_lights) 
+        effect_name: str,
+        effect_config: Dict[str, Any]
+    ) -> type:
+        """Create a new effect class from configuration."""
+        try:
+            effect_class = type(
+                effect_name,
+                (BaseEffect,),
+                {
+                    "name": effect_name,
+                    "config": effect_config,
+                    "async_update": self._create_update_method(effect_config),
+                }
+            )
+            return effect_class
+
+        except Exception as err:
+            _LOGGER.error("Failed to create effect class: %s", err)
+            raise
+
+    def _create_update_method(
+        self,
+        config: Dict[str, Any]
+    ) -> Any:
+        """Create the update method for the effect."""
+        def update_method(self, audio_data, beat_detected, bpm):
+            pass
+        return update_method

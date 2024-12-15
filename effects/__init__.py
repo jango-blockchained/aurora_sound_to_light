@@ -15,6 +15,7 @@ __all__ = [
     "ColorWaveEffect",
 ]
 
+
 class EffectEngine:
     """Engine for managing and running effects."""
 
@@ -26,11 +27,16 @@ class EffectEngine:
             "color_wave": ColorWaveEffect,
         }
 
-    async def create_effect(self, effect_name: str, lights: list[str], params: dict | None = None) -> BaseEffect:
+    async def create_effect(
+        self,
+        effect_name: str,
+        lights: list[str],
+        params: dict | None = None
+    ) -> BaseEffect:
         """Create an effect instance."""
         if effect_name not in self._effects:
             raise ValueError(f"Unknown effect: {effect_name}")
-        
+
         effect_class = self._effects[effect_name]
         return effect_class(self.hass, lights, params or {})
 
@@ -38,6 +44,7 @@ class EffectEngine:
         """Get list of available effects."""
         return list(self._effects.keys())
 
+
 async def get_effect_engine(hass: HomeAssistant) -> EffectEngine:
     """Get or create an effect engine instance."""
-    return EffectEngine(hass) 
+    return EffectEngine(hass)

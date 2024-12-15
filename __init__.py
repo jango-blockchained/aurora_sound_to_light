@@ -15,8 +15,6 @@ from .light_controller import LightController
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.LIGHT, Platform.SENSOR]
-
-# Frontend module URL
 MODULE_URL = "/local/aurora_sound_to_light/aurora-dashboard.js"
 
 
@@ -36,7 +34,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
             "frontend"
         )
     )
-    
+
     try:
         files = await hass.async_add_executor_job(
             lambda: [
@@ -44,7 +42,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 if f.suffix in ['.js', '.html']
             ]
         )
-        
+
         for src_path in files:
             dst_path = local_dir / src_path.name
             try:
@@ -63,8 +61,6 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
                 )
     except Exception as err:
         _LOGGER.error("Failed to process frontend files: %s", err)
-        # Continue even if frontend files failed to copy
-        pass
 
     # Register the panel
     try:
@@ -113,9 +109,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "light_controller": light_controller,
         }
 
-        # Set up platforms using the new async_forward_entry_setups method
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
         return True
 
     except Exception as err:
@@ -126,13 +120,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     try:
-        # Unload platforms using the new async_unload_platforms method
         unload_ok = await hass.config_entries.async_unload_platforms(
-            entry, PLATFORMS
+            entry,
+            PLATFORMS
         )
 
         if unload_ok:
-            # Clean up
             if DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN]:
                 data = hass.data[DOMAIN].pop(entry.entry_id)
                 if "audio_processor" in data:

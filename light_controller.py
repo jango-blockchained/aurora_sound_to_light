@@ -1,15 +1,15 @@
 """Light controller for Aurora Sound to Light."""
-import logging
 from typing import Any, Dict, List, Optional, Tuple
+import logging
 
-from homeassistant.core import HomeAssistant
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_RGB_COLOR,
     ATTR_TRANSITION,
 )
+from homeassistant.core import HomeAssistant
 
-from .effects import get_effect_engine, EffectEngine
+from .effects import EffectEngine
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +26,6 @@ class LightController:
 
     def get_lights(self) -> List[str]:
         """Get list of available lights."""
-        # For now, return the test light from configuration
         return ["test_light"]
 
     async def update_light(
@@ -94,7 +93,11 @@ class LightController:
             await self._current_effect.start()
 
         except Exception as err:
-            _LOGGER.error("Failed to start effect %s: %s", effect_name, err)
+            _LOGGER.error(
+                "Failed to start effect %s: %s",
+                effect_name,
+                err
+            )
 
     async def stop_effect(self) -> None:
         """Stop the current effect."""

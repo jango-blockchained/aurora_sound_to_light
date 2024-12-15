@@ -29,10 +29,10 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Aurora Sound to Light sensors."""
     _LOGGER.info("Setting up Aurora Sound to Light sensors")
-    
+
     data = hass.data[DOMAIN][config_entry.entry_id]
     audio_processor = data["audio_processor"]
-    
+
     entities = [
         AuroraLatencySensor(
             hass,
@@ -59,7 +59,7 @@ async def async_setup_entry(
             PERCENTAGE,
         ),
     ]
-    
+
     async_add_entities(entities)
 
 

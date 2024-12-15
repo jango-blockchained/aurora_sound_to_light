@@ -37,13 +37,13 @@ class AudioProcessor:
         self.hass = hass
         self.config = config
         self.media_player: Optional[str] = config.get("media_player")
-        
+
         # Initialize FFmpeg
         ffmpeg_bin = shutil.which("ffmpeg")
         if not ffmpeg_bin:
             raise RuntimeError("FFmpeg not found")
         self.ffmpeg = FFmpegManager(self.hass, ffmpeg_bin)
-        
+
         # Audio processing state
         self._running = False
         self._task: Optional[asyncio.Task] = None
@@ -54,13 +54,13 @@ class AudioProcessor:
         self._energy_history = np.zeros(8)
         self._beat_history = np.zeros(8)
         self._tempo_history = np.zeros(4)
-        
+
         # Analysis results
         self._energy = 0.0
         self._is_beat = False
         self._tempo = 0.0
         self._last_beat_time = 0.0
-        
+
         # Set up frequency bands (logarithmic scale)
         self._freq_range = np.logspace(
             np.log10(MIN_FREQ),
@@ -75,7 +75,7 @@ class AudioProcessor:
         """Start audio processing."""
         if self._running:
             return
-            
+
         self._running = True
         self._task = asyncio.create_task(self._process_loop())
         _LOGGER.info("Started audio processor")
@@ -90,11 +90,11 @@ class AudioProcessor:
             except asyncio.CancelledError:
                 pass
             self._task = None
-            
+
         if self._process:
             self._process.terminate()
             self._process = None
-            
+
         _LOGGER.info("Stopped audio processor")
 
     async def _process_loop(self):
@@ -134,27 +134,27 @@ class AudioProcessor:
         """Get the audio stream URL from the media player."""
         if not self.media_player:
             return None
-            
+
         state = self.hass.states.get(self.media_player)
         if not state or state.state != "playing":
             return None
-            
+
         # Handle different media player types
         domain = self.media_player.split(".")[0]
-        
+
         if domain == "spotify":
             return await self._get_spotify_stream(state)
-        
+
         # Try to get direct stream URL from attributes
         content_id = state.attributes.get(ATTR_MEDIA_CONTENT_ID)
         content_type = state.attributes.get(ATTR_MEDIA_CONTENT_TYPE)
-        
+
         if content_id and content_type in (
             MediaType.MUSIC,
             MediaType.PLAYLIST
         ):
             return content_id
-            
+
         return None
 
     async def _get_spotify_stream(self, state) -> Optional[str]:
@@ -163,22 +163,22 @@ class AudioProcessor:
             spotify = self.hass.data.get("spotify")
             if not spotify:
                 return None
-                
+
             track_id = state.attributes.get(ATTR_MEDIA_CONTENT_ID)
             if not track_id:
                 return None
-                
+
             # Get preview URL from Spotify API
             track = await spotify.async_get_track(track_id)
             if not track:
                 return None
-                
+
             preview_url = track.get("preview_url")
             if preview_url:
                 return preview_url
-                
+
             return None
-            
+
         except Exception as err:
             _LOGGER.error("Error getting Spotify stream: %s", err)
             return None
@@ -204,7 +204,7 @@ class AudioProcessor:
                     "-ar", str(SAMPLE_RATE),
                     "-"  # output to pipe
                 ]
-                
+
                 self._process = subprocess.Popen(
                     command,
                     stdout=subprocess.PIPE,
@@ -220,7 +220,7 @@ class AudioProcessor:
 
             # Convert to numpy array
             audio_data = np.frombuffer(raw_data, dtype=np.float32)
-            
+
             # Handle potential size mismatch
             if len(audio_data) < CHUNK_SIZE:
                 audio_data = np.pad(
@@ -243,30 +243,30 @@ class AudioProcessor:
         """Process audio data to extract features."""
         # Apply window function
         windowed = audio_data * np.hanning(len(audio_data))
-        
+
         # Compute FFT
         fft = np.abs(np.fft.rfft(windowed))
         fft = fft / len(fft)
-        
+
         # Calculate frequency bands
         for i in range(NUM_BANDS):
             start, end = self._band_indices[i], self._band_indices[i + 1]
             self._freq_bands[i] = np.mean(fft[start:end])
-        
+
         # Normalize frequency bands
         max_freq = np.max(self._freq_bands)
         if max_freq > 0:
             self._freq_bands = self._freq_bands / max_freq
         else:
             self._freq_bands = np.zeros_like(self._freq_bands)
-        
+
         # Calculate waveform
         self._waveform = np.interp(
             np.linspace(0, len(audio_data), NUM_BANDS),
             np.arange(len(audio_data)),
             audio_data
         )
-        
+
         # Update energy and beat detection
         self._update_energy()
         self._detect_beat()
@@ -278,13 +278,13 @@ class AudioProcessor:
         current_energy = float(
             np.mean(self._freq_bands[:8])  # Lower frequency bands
         )
-        
+
         # Smooth energy
         self._energy = (
             ENERGY_SMOOTH * current_energy +
             (1 - ENERGY_SMOOTH) * self._energy
         )
-        
+
         # Update history
         self._energy_history = np.roll(self._energy_history, 1)
         self._energy_history[0] = current_energy
@@ -294,13 +294,13 @@ class AudioProcessor:
         # Calculate local energy average
         local_average = float(np.mean(self._energy_history))
         local_variance = float(np.var(self._energy_history))
-        
+
         # Beat detection
         beat_energy = float(np.mean(self._freq_bands[:4]))  # Focus on bass
         threshold = local_average + BEAT_THRESHOLD * local_variance
-        
+
         self._is_beat = bool(beat_energy > threshold)
-        
+
         if self._is_beat:
             current_time = asyncio.get_event_loop().time()
             if self._last_beat_time > 0:
@@ -332,12 +332,12 @@ class AudioProcessor:
                 "beat": bool(self._is_beat),
                 "tempo": float(self._tempo)
             }
-            
+
             # Fire event
             self.hass.bus.async_fire(
                 "aurora_audio_update",
                 event_data
             )
-            
+
         except Exception as err:
             _LOGGER.error("Error notifying update: %s", err)

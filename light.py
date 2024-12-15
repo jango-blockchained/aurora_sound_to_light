@@ -25,16 +25,16 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Aurora Sound to Light platform."""
     _LOGGER.info("Setting up Aurora Sound to Light light platform")
-    
+
     # Get the light controller from our domain data
     data = hass.data[DOMAIN][config_entry.entry_id]
     light_controller = data["light_controller"]
-    
+
     # Create and add entities
     entities = []
     for light_id in light_controller.get_lights():
         entities.append(AuroraLight(hass, light_id, light_controller))
-    
+
     async_add_entities(entities)
 
 
@@ -63,13 +63,13 @@ class AuroraLight(LightEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the light on."""
         self._attr_is_on = True
-        
+
         if ATTR_BRIGHTNESS in kwargs:
             self._attr_brightness = kwargs[ATTR_BRIGHTNESS]
-        
+
         if ATTR_RGB_COLOR in kwargs:
             self._attr_rgb_color = kwargs[ATTR_RGB_COLOR]
-        
+
         # Update the light through the controller
         await self._controller.update_light(
             self._light_id,

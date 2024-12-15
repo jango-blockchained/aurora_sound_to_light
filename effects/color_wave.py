@@ -1,85 +1,95 @@
-"""Color Wave effect for Aurora Sound to Light."""
-from __future__ import annotations
-
-import logging
-from typing import Any, Dict, List, Optional
-
-import numpy as np
+"""Color wave effect for Aurora Sound to Light."""
+import math
+from typing import Any, Dict, List, Optional, Tuple
 
 from homeassistant.core import HomeAssistant
-
-from .base_effect import BaseEffect
-from ..const import (
-    PARAM_COLOR,
-    PARAM_SPEED,
-    PARAM_BRIGHTNESS,
-    PARAM_TRANSITION_TIME,
-    DEFAULT_COLOR,
-    DEFAULT_SPEED,
-    DEFAULT_BRIGHTNESS,
-    DEFAULT_TRANSITION_TIME,
+from homeassistant.components.light import (
+    ATTR_BRIGHTNESS,
+    ATTR_RGB_COLOR,
 )
 
-_LOGGER = logging.getLogger(__name__)
+from .base_effect import BaseEffect
+
 
 class ColorWaveEffect(BaseEffect):
-    """Color wave effect that creates a flowing wave of colors based on audio."""
+    """Effect that creates a wave of colors across lights."""
 
     def __init__(
         self,
         hass: HomeAssistant,
-        light_ids: List[str],
-        params: Optional[Dict[str, Any]] = None,
+        lights: List[str],
+        params: Optional[Dict[str, Any]] = None
     ) -> None:
         """Initialize the color wave effect."""
-        super().__init__(hass, light_ids, params)
-        self.name = "Color Wave"
-        self.description = "Creates a flowing wave of colors based on audio intensity"
-        self.phase = 0.0
+        super().__init__(hass, lights, params)
+        self._phase = 0.0
+        self._speed = 0.1  # Radians per update
+        self._brightness = 255
 
-    async def process_audio(self, audio_data: np.ndarray) -> None:
-        """Process audio data and update lights."""
-        # Calculate the average intensity across frequency bands
-        intensity = np.mean(np.abs(audio_data))
-        
-        # Update the phase based on intensity and speed
-        self.phase += self.speed * intensity
-        if self.phase > 2 * np.pi:
-            self.phase -= 2 * np.pi
+    async def update(
+        self,
+        audio_data: Optional[List[float]] = None,
+        beat_detected: bool = False,
+        bpm: int = 0
+    ) -> None:
+        """Update the effect with new audio data."""
+        if not self.is_running:
+            return
 
-        # Calculate color components with smooth transitions
-        r = int((np.sin(self.phase) + 1) * 127.5)
-        g = int((np.sin(self.phase + 2 * np.pi / 3) + 1) * 127.5)
-        b = int((np.sin(self.phase + 4 * np.pi / 3) + 1) * 127.5)
+        # Update phase
+        self._phase += self._speed
+        if self._phase >= 2 * math.pi:
+            self._phase -= 2 * math.pi
 
-        # Scale brightness based on audio intensity
-        brightness = min(255, int(self.brightness * (0.5 + 0.5 * intensity)))
+        # Calculate colors for each light
+        for i, light in enumerate(self.lights):
+            # Calculate color based on position and phase
+            phase_offset = (i / len(self.lights)) * 2 * math.pi
+            hue = (self._phase + phase_offset) % (2 * math.pi)
 
-        # Update all lights in the group
-        for light_id in self.light_ids:
-            await self.update_lights(
-                light_id=light_id,
-                rgb_color=[r, g, b],
-                brightness=brightness,
-                transition=self.transition_time,
+            # Convert HSV to RGB
+            rgb = self._hsv_to_rgb(hue / (2 * math.pi), 1.0, 1.0)
+
+            # Update light
+            await self.hass.services.async_call(
+                "light",
+                "turn_on",
+                {
+                    "entity_id": light,
+                    ATTR_BRIGHTNESS: self._brightness,
+                    ATTR_RGB_COLOR: rgb,
+                },
+                blocking=True,
             )
 
-    def get_config(self) -> dict[str, Any]:
-        """Get the current configuration of the effect."""
-        return {
-            "color": self.color,
-            "speed": self.speed,
-            "brightness": self.brightness,
-            "transition_time": self.transition_time,
-        }
+    def _hsv_to_rgb(
+        self,
+        h: float,
+        s: float,
+        v: float
+    ) -> Tuple[int, int, int]:
+        """Convert HSV color values to RGB."""
+        if s == 0.0:
+            return (int(v * 255),) * 3
 
-    def update_config(self, config: dict[str, Any]) -> None:
-        """Update the effect configuration."""
-        if "color" in config:
-            self.color = config["color"]
-        if "speed" in config:
-            self.speed = config["speed"]
-        if "brightness" in config:
-            self.brightness = config["brightness"]
-        if "transition_time" in config:
-            self.transition_time = config["transition_time"] 
+        i = int(h * 6.0)
+        f = (h * 6.0) - i
+        p = v * (1.0 - s)
+        q = v * (1.0 - s * f)
+        t = v * (1.0 - s * (1.0 - f))
+        i = i % 6
+
+        if i == 0:
+            rgb = (v, t, p)
+        elif i == 1:
+            rgb = (q, v, p)
+        elif i == 2:
+            rgb = (p, v, t)
+        elif i == 3:
+            rgb = (p, q, v)
+        elif i == 4:
+            rgb = (t, p, v)
+        else:
+            rgb = (v, p, q)
+
+        return tuple(int(x * 255) for x in rgb)
