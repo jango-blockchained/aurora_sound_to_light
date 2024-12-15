@@ -3,9 +3,9 @@
         "step": {
             "user": {
                 "title": "Aurora Sound to Light Setup",
-                "description": "Configure your sound-reactive lighting system",
+                "description": "Choose your audio input source and configure basic settings",
                 "data": {
-                    "audio_input_selection": "Audio Input Source",
+                    "audio_input": "Audio Input Source",
                     "buffer_size": "Audio Buffer Size (ms)",
                     "latency_threshold": "Maximum Latency (ms)"
                 }
@@ -19,26 +19,30 @@
             }
         },
         "error": {
-            "unknown": "Unexpected error occurred",
-            "cannot_connect": "Failed to connect to audio device",
-            "invalid_auth": "Invalid authentication",
-            "already_configured": "Device is already configured"
+            "already_configured": "Integration is already configured",
+            "audio_init_failed": "Failed to initialize audio device. Please check your microphone or FFmpeg installation.",
+            "media_player_error": "Selected media player is not available",
+            "media_player_list_error": "Failed to get list of media players",
+            "unknown": "Unexpected error occurred"
         },
         "abort": {
-            "already_configured": "Aurora Sound to Light is already configured. Only one instance is allowed.",
-            "no_media_players": "No compatible media players found. Please add a media player first."
+            "already_configured": "Aurora Sound to Light is already configured",
+            "no_media_players": "No media players found in your system"
         }
     },
     "options": {
         "step": {
             "init": {
                 "title": "Aurora Sound to Light Options",
-                "description": "Adjust audio processing and latency settings",
+                "description": "Adjust audio processing settings",
                 "data": {
                     "buffer_size": "Audio Buffer Size (ms)",
                     "latency_threshold": "Maximum Latency (ms)"
                 }
             }
+        },
+        "error": {
+            "unknown": "Unexpected error occurred while saving options"
         }
     }
 }
