@@ -27,7 +27,8 @@
         },
         "abort": {
             "already_configured": "Aurora Sound to Light is already configured",
-            "no_media_players": "No media players found in your system"
+            "no_media_players": "No media players found in your system",
+            "invalid_media_player": "Selected media player is not valid"
         }
     },
     "options": {
@@ -43,6 +44,14 @@
         },
         "error": {
             "unknown": "Unexpected error occurred while saving options"
+        }
+    },
+    "selector": {
+        "audio_input": {
+            "options": {
+                "microphone": "Microphone",
+                "media_player": "Media Player"
+            }
         }
     }
 }

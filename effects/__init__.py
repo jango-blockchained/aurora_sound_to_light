@@ -6,9 +6,6 @@ from homeassistant.core import HomeAssistant
 from .base_effect import BaseEffect
 from .bass_pulse import BassPulseEffect
 from .color_wave import ColorWaveEffect
-from .frequency_sweep import FrequencySweepEffect
-from .rainbow_flow import RainbowFlowEffect
-from .strobe_sync import StrobeSyncEffect
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -16,9 +13,6 @@ __all__ = [
     "BaseEffect",
     "BassPulseEffect",
     "ColorWaveEffect",
-    "FrequencySweepEffect",
-    "RainbowFlowEffect",
-    "StrobeSyncEffect",
 ]
 
 class EffectEngine:
@@ -30,9 +24,6 @@ class EffectEngine:
         self._effects: Dict[str, Type[BaseEffect]] = {
             "bass_pulse": BassPulseEffect,
             "color_wave": ColorWaveEffect,
-            "frequency_sweep": FrequencySweepEffect,
-            "rainbow_flow": RainbowFlowEffect,
-            "strobe_sync": StrobeSyncEffect,
         }
 
     async def create_effect(self, effect_name: str, lights: list[str], params: dict | None = None) -> BaseEffect:

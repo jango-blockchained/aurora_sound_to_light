@@ -1,13 +1,5 @@
-import "./aurora-dashboard.js";
-import "./aurora-effect-selector.js";
-import "./aurora-group-manager.js";
-import "./aurora-visualizer.js";
-import "./aurora-media-controls.js";
-
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "aurora-dashboard",
-  name: "Aurora Sound to Light Dashboard",
-  description: "Control panel for Aurora Sound to Light integration",
-  preview: false,
-}); 
+import './aurora-dashboard.js';
+import './aurora-media-controls.js';
+import './aurora-visualizer.js';
+import './aurora-effect-selector.js';
+import './aurora-group-manager.js'; 

@@ -94,3 +94,65 @@ delete_effect:
 list_effects:
   name: List Effects
   description: List all available effects (both built-in and custom) 
+
+set_effect:
+  name: Set Effect
+  description: Set the active light effect
+  fields:
+    effect_id:
+      name: Effect ID
+      description: ID of the effect to activate
+      required: true
+      example: "bass_pulse"
+      selector:
+        text:
+
+set_media_player:
+  name: Set Media Player
+  description: Set the media player to use for audio input
+  fields:
+    entity_id:
+      name: Media Player
+      description: The entity ID of the media player to use
+      required: true
+      selector:
+        entity:
+          domain: media_player
+
+update_groups:
+  name: Update Light Groups
+  description: Update the light groups configuration
+  fields:
+    groups:
+      name: Groups
+      description: List of light group configurations
+      required: true
+      example: |
+        [
+          {
+            "id": "living_room",
+            "name": "Living Room",
+            "lights": ["light.living_room_1", "light.living_room_2"]
+          }
+        ]
+      selector:
+        object:
+
+start_audio_capture:
+  name: Start Audio Capture
+  description: Start capturing audio from the selected source
+  fields:
+    source:
+      name: Source
+      description: Audio source to use
+      required: true
+      example: "microphone"
+      selector:
+        select:
+          options:
+            - "microphone"
+            - "media_player"
+
+stop_audio_capture:
+  name: Stop Audio Capture
+  description: Stop capturing audio

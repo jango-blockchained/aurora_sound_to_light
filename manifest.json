@@ -6,23 +6,29 @@
     "dependencies": [
         "ffmpeg",
         "light",
-        "template"
+        "template",
+        "media_player",
+        "frontend",
+        "spotify"
     ],
     "codeowners": [],
     "requirements": [
         "numpy>=1.21.0",
-        "pyaudio>=0.2.11"
+        "pyaudio>=0.2.11",
+        "av>=9.2.0"
     ],
     "iot_class": "local_push",
     "version": "1.0.0",
     "config_flow": true,
     "integration_type": "hub",
+    "frontend_js_module": "/custom_components/aurora_sound_to_light/frontend/index.js",
     "system_requirements": [
         "python3-pyaudio",
         "portaudio19-dev",
         "libasound2-dev",
         "libportaudio2",
         "libportaudiocpp0",
-        "libjack-jackd2-dev"
+        "libjack-jackd2-dev",
+        "ffmpeg"
     ]
 }

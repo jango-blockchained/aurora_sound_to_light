@@ -7,7 +7,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, selector
 from homeassistant.components.media_player import DOMAIN as MEDIA_PLAYER_DOMAIN
 
 from .const import (
@@ -23,7 +23,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-class AuroraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+
+class AuroraSoundToLightConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Aurora Sound to Light."""
 
     VERSION = 1
@@ -31,6 +32,7 @@ class AuroraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the config flow."""
         self._errors = {}
+        self._data = {}
 
     async def async_step_user(
         self, user_input: dict[str, any] | None = None
@@ -44,8 +46,11 @@ class AuroraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user",
                 data_schema=vol.Schema(
                     {
-                        vol.Required(CONF_AUDIO_INPUT): vol.In(
-                            [AUDIO_INPUT_MIC, AUDIO_INPUT_MEDIA_PLAYER]
+                        vol.Required(CONF_AUDIO_INPUT): selector.SelectSelector(
+                            selector.SelectSelectorConfig(
+                                options=[AUDIO_INPUT_MIC, AUDIO_INPUT_MEDIA_PLAYER],
+                                translation_key="audio_input",
+                            )
                         ),
                         vol.Optional(
                             CONF_BUFFER_SIZE, default=DEFAULT_BUFFER_SIZE
@@ -58,11 +63,12 @@ class AuroraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         try:
+            self._data.update(user_input)
             if user_input[CONF_AUDIO_INPUT] == AUDIO_INPUT_MEDIA_PLAYER:
-                return await self.async_step_media_player(user_input)
+                return await self.async_step_media_player()
             return self.async_create_entry(
                 title="Aurora Sound to Light",
-                data=user_input,
+                data=self._data,
             )
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception("Unexpected exception")
@@ -72,8 +78,11 @@ class AuroraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_AUDIO_INPUT): vol.In(
-                        [AUDIO_INPUT_MIC, AUDIO_INPUT_MEDIA_PLAYER]
+                    vol.Required(CONF_AUDIO_INPUT): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[AUDIO_INPUT_MIC, AUDIO_INPUT_MEDIA_PLAYER],
+                            translation_key="audio_input",
+                        )
                     ),
                     vol.Optional(
                         CONF_BUFFER_SIZE, default=DEFAULT_BUFFER_SIZE
@@ -90,15 +99,22 @@ class AuroraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, any] | None = None
     ) -> FlowResult:
         """Handle media player selection."""
-        if not self.hass.states.async_all(MEDIA_PLAYER_DOMAIN):
+        media_players = self.hass.states.async_all(MEDIA_PLAYER_DOMAIN)
+        if not media_players:
             return self.async_abort(reason="no_media_players")
 
         if user_input is None:
+            media_player_entities = [state.entity_id for state in media_players]
             return self.async_show_form(
                 step_id="media_player",
                 data_schema=vol.Schema(
                     {
-                        vol.Required("media_player"): str,
+                        vol.Required("media_player"): selector.EntitySelector(
+                            selector.EntitySelectorConfig(
+                                domain=MEDIA_PLAYER_DOMAIN,
+                                multiple=False,
+                            )
+                        ),
                     }
                 ),
             )
@@ -108,10 +124,10 @@ class AuroraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not self.hass.states.get(media_player):
                 return self.async_abort(reason="invalid_media_player")
 
-            user_input["media_player"] = media_player
+            self._data.update(user_input)
             return self.async_create_entry(
                 title="Aurora Sound to Light",
-                data=user_input,
+                data=self._data,
             )
         except Exception as ex:  # pylint: disable=broad-except
             _LOGGER.exception("Unexpected exception")
@@ -121,7 +137,12 @@ class AuroraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="media_player",
             data_schema=vol.Schema(
                 {
-                    vol.Required("media_player"): str,
+                    vol.Required("media_player"): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain=MEDIA_PLAYER_DOMAIN,
+                            multiple=False,
+                        )
+                    ),
                 }
             ),
             errors=self._errors,
@@ -131,17 +152,19 @@ class AuroraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
-    ) -> AuroraOptionsFlow:
+    ) -> AuroraSoundToLightOptionsFlow:
         """Get the options flow for this handler."""
-        return AuroraOptionsFlow(config_entry)
+        return AuroraSoundToLightOptionsFlow(config_entry)
 
 
-class AuroraOptionsFlow(config_entries.OptionsFlow):
+class AuroraSoundToLightOptionsFlow(config_entries.OptionsFlow):
     """Handle options."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+        super().__init__()
+        self._entry = config_entry
+        self._options = dict(config_entry.options)
 
     async def async_step_init(
         self, user_input: dict[str, any] | None = None
@@ -156,13 +179,13 @@ class AuroraOptionsFlow(config_entries.OptionsFlow):
                 {
                     vol.Optional(
                         CONF_BUFFER_SIZE,
-                        default=self.config_entry.options.get(
+                        default=self._options.get(
                             CONF_BUFFER_SIZE, DEFAULT_BUFFER_SIZE
                         ),
                     ): cv.positive_int,
                     vol.Optional(
                         CONF_LATENCY_THRESHOLD,
-                        default=self.config_entry.options.get(
+                        default=self._options.get(
                             CONF_LATENCY_THRESHOLD, DEFAULT_LATENCY_THRESHOLD
                         ),
                     ): cv.positive_int,

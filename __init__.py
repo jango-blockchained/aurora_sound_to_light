@@ -1,11 +1,12 @@
 """The Aurora Sound to Light integration."""
 import logging
 import sys
-import asyncio
+from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.components import frontend
 
 from .const import DOMAIN
 from .audio_processor import AudioProcessor
@@ -15,6 +16,80 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.LIGHT, Platform.SENSOR]
 
+# Frontend module URL
+MODULE_URL = "/local/aurora_sound_to_light/aurora-dashboard.js"
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up the Aurora Sound to Light component."""
+    hass.data.setdefault(DOMAIN, {})
+
+    # Create local directory for frontend files
+    local_dir = Path(hass.config.path("www", "aurora_sound_to_light"))
+    local_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy frontend files to local directory
+    src_dir = Path(
+        hass.config.path(
+            "custom_components",
+            "aurora_sound_to_light",
+            "frontend"
+        )
+    )
+    
+    try:
+        files = await hass.async_add_executor_job(
+            lambda: [
+                f for f in src_dir.iterdir()
+                if f.suffix in ['.js', '.html']
+            ]
+        )
+        
+        for src_path in files:
+            dst_path = local_dir / src_path.name
+            try:
+                content = await hass.async_add_executor_job(
+                    lambda: src_path.read_bytes()
+                )
+                await hass.async_add_executor_job(
+                    lambda: dst_path.write_bytes(content)
+                )
+                _LOGGER.debug("Copied frontend file: %s", src_path.name)
+            except Exception as err:
+                _LOGGER.error(
+                    "Failed to copy frontend file %s: %s",
+                    src_path.name,
+                    err
+                )
+    except Exception as err:
+        _LOGGER.error("Failed to process frontend files: %s", err)
+        # Continue even if frontend files failed to copy
+        pass
+
+    # Register the panel
+    try:
+        frontend.async_register_built_in_panel(
+            hass,
+            component_name="custom",
+            sidebar_title="Aurora",
+            sidebar_icon="mdi:lightbulb-multiple",
+            frontend_url_path="aurora-sound-to-light",
+            config={
+                "_panel_custom": {
+                    "name": "aurora-dashboard",
+                    "embed_iframe": False,
+                    "trust_external": True,
+                    "module_url": MODULE_URL,
+                }
+            },
+            require_admin=False
+        )
+        _LOGGER.info("Successfully registered Aurora panel")
+    except Exception as err:
+        _LOGGER.error("Failed to register panel: %s", err)
+
+    return True
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Aurora Sound to Light from a config entry."""
@@ -22,7 +97,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Log basic information
         _LOGGER.info("Setting up Aurora Sound to Light integration")
         _LOGGER.info("Python version: %s", sys.version)
-        _LOGGER.info("Home Assistant version: %s", getattr(hass, "version", "unknown"))
+        _LOGGER.info(
+            "Home Assistant version: %s",
+            getattr(hass, "version", "unknown")
+        )
 
         # Initialize components
         audio_processor = AudioProcessor(hass, entry.data)
@@ -35,11 +113,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "light_controller": light_controller,
         }
 
-        # Set up platforms one by one to avoid blocking imports
-        for platform in PLATFORMS:
-            hass.async_create_task(
-                hass.config_entries.async_forward_entry_setup(entry, platform)
-            )
+        # Set up platforms using the new async_forward_entry_setups method
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
         return True
 
@@ -51,14 +126,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     try:
-        # Unload platforms one by one
-        unload_ok = True
-        for platform in PLATFORMS:
-            try:
-                await hass.config_entries.async_forward_entry_unload(entry, platform)
-            except Exception as err:
-                _LOGGER.error("Error unloading platform %s: %s", platform, err)
-                unload_ok = False
+        # Unload platforms using the new async_unload_platforms method
+        unload_ok = await hass.config_entries.async_unload_platforms(
+            entry, PLATFORMS
+        )
 
         if unload_ok:
             # Clean up
