@@ -44,6 +44,11 @@ DELETE_EFFECT_SCHEMA = vol.Schema({
     vol.Required("effect_id"): cv.string,
 })
 
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up the Aurora Sound to Light component."""
+    hass.data.setdefault(DOMAIN, {})
+    return True
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Aurora Sound to Light from a config entry."""
     hass.data.setdefault(DOMAIN, {})
@@ -74,7 +79,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Initialize components
     await light_controller.async_setup()
     await audio_processor.start()
-    
+
     # Register services
     async def create_effect(call: ServiceCall) -> None:
         """Handle create effect service call."""
@@ -107,47 +112,54 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def delete_effect(call: ServiceCall) -> None:
         """Handle delete effect service call."""
         light_controller = next(iter(hass.data[DOMAIN].values()))["light_controller"]
-        success = await light_controller.delete_custom_effect(call.data["effect_id"])
+        success = await light_controller.delete_custom_effect(
+            effect_id=call.data["effect_id"]
+        )
         if success:
             _LOGGER.info("Deleted custom effect: %s", call.data["effect_id"])
         else:
             _LOGGER.error("Failed to delete custom effect: %s", call.data["effect_id"])
 
-    async def list_effects(call: ServiceCall) -> None:
-        """Handle list effects service call."""
-        light_controller = next(iter(hass.data[DOMAIN].values()))["light_controller"]
-        return {"effects": light_controller.available_effects}
+    # Register services
+    hass.services.async_register(
+        DOMAIN,
+        "create_effect",
+        create_effect,
+        schema=CREATE_EFFECT_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "update_effect",
+        update_effect,
+        schema=UPDATE_EFFECT_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "delete_effect",
+        delete_effect,
+        schema=DELETE_EFFECT_SCHEMA,
+    )
 
-    hass.services.async_register(
-        DOMAIN, "create_effect", create_effect, schema=CREATE_EFFECT_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, "update_effect", update_effect, schema=UPDATE_EFFECT_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, "delete_effect", delete_effect, schema=DELETE_EFFECT_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, "list_effects", list_effects
-    )
-    
+    # Forward the setup to the sensor platform
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    # Stop audio processing
-    if DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN]:
-        audio_processor = hass.data[DOMAIN][entry.entry_id]["audio_processor"]
-        light_controller = hass.data[DOMAIN][entry.entry_id]["light_controller"]
-        
-        await audio_processor.stop()
-        await light_controller.stop()
-    
-    # Unload platforms
+    # Unload sensors
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     
     if unload_ok:
+        # Stop audio processor and light controller
+        audio_processor = hass.data[DOMAIN][entry.entry_id]["audio_processor"]
+        await audio_processor.stop()
+        
+        # Remove data
         hass.data[DOMAIN].pop(entry.entry_id)
-
+        
+        # Remove services if this is the last instance
+        if not hass.data[DOMAIN]:
+            for service in ["create_effect", "update_effect", "delete_effect"]:
+                hass.services.async_remove(DOMAIN, service)
+    
     return unload_ok

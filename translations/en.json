@@ -28,5 +28,17 @@
             "already_configured": "Aurora Sound to Light is already configured. Only one instance is allowed.",
             "no_media_players": "No compatible media players found. Please add a media player first."
         }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Aurora Sound to Light Options",
+                "description": "Adjust audio processing and latency settings",
+                "data": {
+                    "buffer_size": "Audio Buffer Size (ms)",
+                    "latency_threshold": "Maximum Latency (ms)"
+                }
+            }
+        }
     }
 }

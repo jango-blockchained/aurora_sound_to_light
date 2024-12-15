@@ -7,7 +7,7 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.components.media_player import DOMAIN as MEDIA_PLAYER_DOMAIN
 
@@ -136,7 +136,9 @@ class AuroraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Get list of media players
         media_players = []
-        for entity_id in self.hass.states.async_entity_ids(MEDIA_PLAYER_DOMAIN):
+        for entity_id in self.hass.states.async_entity_ids(
+            MEDIA_PLAYER_DOMAIN
+        ):
             state = self.hass.states.get(entity_id)
             if state:
                 media_players.append(entity_id)
