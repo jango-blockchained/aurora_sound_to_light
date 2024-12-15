@@ -4,17 +4,14 @@ import logging
 import numpy as np
 import subprocess
 import shutil
-from typing import Dict, Optional, Tuple
-import av
-import io
+from typing import Dict, Optional
 
 from homeassistant.core import HomeAssistant
 from homeassistant.components.ffmpeg import FFmpegManager
+from homeassistant.components.media_player import MediaType
 from homeassistant.components.media_player.const import (
     ATTR_MEDIA_CONTENT_ID,
     ATTR_MEDIA_CONTENT_TYPE,
-    MEDIA_TYPE_MUSIC,
-    MEDIA_TYPE_PLAYLIST,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,7 +37,12 @@ class AudioProcessor:
         self.hass = hass
         self.config = config
         self.media_player: Optional[str] = config.get("media_player")
-        self.ffmpeg = FFmpegManager(self.hass)
+        
+        # Initialize FFmpeg
+        ffmpeg_bin = shutil.which("ffmpeg")
+        if not ffmpeg_bin:
+            raise RuntimeError("FFmpeg not found")
+        self.ffmpeg = FFmpegManager(self.hass, ffmpeg_bin)
         
         # Audio processing state
         self._running = False
@@ -137,18 +139,21 @@ class AudioProcessor:
         if not state or state.state != "playing":
             return None
             
-        # Try to get direct stream URL from attributes
-        stream_url = state.attributes.get("media_content_id")
-        if stream_url:
-            return stream_url
-            
         # Handle different media player types
         domain = self.media_player.split(".")[0]
         
         if domain == "spotify":
             return await self._get_spotify_stream(state)
-        elif domain == "media_player":
-            return await self._get_generic_stream(state)
+        
+        # Try to get direct stream URL from attributes
+        content_id = state.attributes.get(ATTR_MEDIA_CONTENT_ID)
+        content_type = state.attributes.get(ATTR_MEDIA_CONTENT_TYPE)
+        
+        if content_id and content_type in (
+            MediaType.MUSIC,
+            MediaType.PLAYLIST
+        ):
+            return content_id
             
         return None
 
@@ -159,34 +164,23 @@ class AudioProcessor:
             if not spotify:
                 return None
                 
-            track_id = state.attributes.get("media_content_id")
+            track_id = state.attributes.get(ATTR_MEDIA_CONTENT_ID)
             if not track_id:
                 return None
                 
             # Get preview URL from Spotify API
-            result = await spotify.async_get_track(track_id)
-            return result.get("preview_url")
+            track = await spotify.async_get_track(track_id)
+            if not track:
+                return None
+                
+            preview_url = track.get("preview_url")
+            if preview_url:
+                return preview_url
+                
+            return None
             
         except Exception as err:
             _LOGGER.error("Error getting Spotify stream: %s", err)
-            return None
-
-    async def _get_generic_stream(self, state) -> Optional[str]:
-        """Get audio stream from generic media player."""
-        try:
-            content_id = state.attributes.get(ATTR_MEDIA_CONTENT_ID)
-            content_type = state.attributes.get(ATTR_MEDIA_CONTENT_TYPE)
-            
-            if not content_id or content_type not in (
-                MEDIA_TYPE_MUSIC,
-                MEDIA_TYPE_PLAYLIST
-            ):
-                return None
-                
-            return content_id
-            
-        except Exception as err:
-            _LOGGER.error("Error getting media stream: %s", err)
             return None
 
     async def _get_audio_data(self) -> Optional[np.ndarray]:
@@ -261,7 +255,10 @@ class AudioProcessor:
         
         # Normalize frequency bands
         max_freq = np.max(self._freq_bands)
-        self._freq_bands = self._freq_bands / (max_freq + 1e-10)
+        if max_freq > 0:
+            self._freq_bands = self._freq_bands / max_freq
+        else:
+            self._freq_bands = np.zeros_like(self._freq_bands)
         
         # Calculate waveform
         self._waveform = np.interp(
@@ -278,7 +275,9 @@ class AudioProcessor:
     def _update_energy(self):
         """Update energy levels."""
         # Calculate current energy (focus on bass frequencies)
-        current_energy = np.mean(self._freq_bands[:8])  # Lower frequency bands
+        current_energy = float(
+            np.mean(self._freq_bands[:8])  # Lower frequency bands
+        )
         
         # Smooth energy
         self._energy = (
@@ -293,14 +292,14 @@ class AudioProcessor:
     def _detect_beat(self):
         """Detect beats in the audio."""
         # Calculate local energy average
-        local_average = np.mean(self._energy_history)
-        local_variance = np.var(self._energy_history)
+        local_average = float(np.mean(self._energy_history))
+        local_variance = float(np.var(self._energy_history))
         
         # Beat detection
-        beat_energy = np.mean(self._freq_bands[:4])  # Focus on bass
+        beat_energy = float(np.mean(self._freq_bands[:4]))  # Focus on bass
         threshold = local_average + BEAT_THRESHOLD * local_variance
         
-        self._is_beat = beat_energy > threshold
+        self._is_beat = bool(beat_energy > threshold)
         
         if self._is_beat:
             current_time = asyncio.get_event_loop().time()
@@ -320,7 +319,7 @@ class AudioProcessor:
             self._tempo_history = np.roll(self._tempo_history, 1)
             self._tempo_history[0] = self._tempo
             # Use median for stability
-            self._tempo = np.median(self._tempo_history)
+            self._tempo = float(np.median(self._tempo_history))
 
     async def _notify_update(self):
         """Notify visualization of new audio data."""
