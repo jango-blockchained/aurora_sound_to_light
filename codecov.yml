@@ -1,0 +1,75 @@
+codecov:
+  require_ci_to_pass: yes
+  notify:
+    wait_for_ci: yes
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 2%
+      frontend:
+        target: 80%
+        flags:
+          - frontend
+      integration:
+        target: 80%
+        flags:
+          - integration-py39-ha2023.8.0
+          - integration-py39-halatest
+          - integration-py310-ha2023.8.0
+          - integration-py310-halatest
+          - integration-py311-ha2023.8.0
+          - integration-py311-halatest
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+
+flags:
+  frontend:
+    paths:
+      - frontend/
+    carryforward: true
+  integration-py39-ha2023.8.0:
+    paths:
+      - custom_components/
+      - tests/integration/
+    carryforward: true
+  integration-py39-halatest:
+    paths:
+      - custom_components/
+      - tests/integration/
+    carryforward: true
+  integration-py310-ha2023.8.0:
+    paths:
+      - custom_components/
+      - tests/integration/
+    carryforward: true
+  integration-py310-halatest:
+    paths:
+      - custom_components/
+      - tests/integration/
+    carryforward: true
+  integration-py311-ha2023.8.0:
+    paths:
+      - custom_components/
+      - tests/integration/
+    carryforward: true
+  integration-py311-halatest:
+    paths:
+      - custom_components/
+      - tests/integration/
+    carryforward: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: no
+  require_head: yes
+  show_carryforward_flags: true 

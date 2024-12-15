@@ -1,0 +1,9 @@
+- Always check the project structure and files before creating new files.
+- Also update the `_files.md` file with the new file.
+- Always check the `_files.md` file before creating new files.
+- Always check `_tasks.md` file before creating and on finishing new tasks.
+
+- Keep in mind that homeassiatnt is running in a docker container called `homeassistant`.
+- This project is part of the injected directory.
+- From inside the Container, the project is located at /config/custom_components/aurora_sound_to_light.
+- The project is mounted as a volume in the container, so any changes made to the files in the project directory will be reflected in the container.

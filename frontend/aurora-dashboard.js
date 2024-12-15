@@ -170,6 +170,12 @@ class AuroraDashboard extends LitElement {
                             .audioData=${this._audioData}
                         ></aurora-group-manager>
                     </div>
+                    <div class="control-section">
+                        <div class="section-header">System Performance</div>
+                        <aurora-performance-monitor
+                            .hass=${this.hass}
+                        ></aurora-performance-monitor>
+                    </div>
                 </div>
             </ha-card>
         `;

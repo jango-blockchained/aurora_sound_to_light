@@ -1,6 +1,3 @@
-I'll create a detailed project structure file that maps out all directories and files for the Aurora Sound to Light integration.
-
-```markdown
 # Aurora Sound to Light - Project Structure
 
 📦 aurora_sound_to_light
@@ -36,13 +33,15 @@ I'll create a detailed project structure file that maps out all directories and 
 │       │   ├── 📄 audio_sensor.py      # Audio metrics sensor
 │       │   └── 📄 performance_sensor.py # Performance metrics
 │       │
-│       └── 📂 ui                       # Frontend components
-│           ├── 📄 __init__.py
-│           ├── 📄 dashboard.py         # Main dashboard
-│           └── 📂 cards                # Custom cards
-│               ├── 📄 frequency_viz.py  # Frequency visualizer
-│               ├── 📄 group_manager.py  # Light group management
-│               └── 📄 effect_selector.py # Effect selection UI
+│       └── 📂 frontend                 # Frontend components
+│           ├── 📄 index.js             # Frontend entry point
+│           ├── 📄 index.html           # Frontend HTML template
+│           ├── 📄 aurora-dashboard.js  # Main dashboard component
+│           ├── 📄 aurora-media-controls.js # Media player controls
+│           ├── 📄 aurora-visualizer.js # Audio visualization
+│           ├── 📄 aurora-effect-selector.js # Effect selection
+│           ├── 📄 aurora-group-manager.js # Light group management
+│           └── 📄 aurora-performance-monitor.js # System performance monitoring
 │
 ├── 📂 tests                            # Test suite
 │   ├── 📄 __init__.py
@@ -64,23 +63,3 @@ I'll create a detailed project structure file that maps out all directories and 
 ├── 📄 LICENSE                          # License information
 ├── 📄 requirements.txt                 # Python dependencies
 └── 📄 hacs.json                        # HACS configuration
-
-```
-
-This structure follows Home Assistant's best practices and includes:
-
-1. Main integration code in `custom_components/`
-2. Modular organization with separate directories for core, effects, sensors, and UI
-3. Comprehensive test suite
-4. GitHub workflow configuration
-5. Documentation and support files
-
-Key features of the structure:
-- Clear separation of concerns
-- Modular design for easy maintenance
-- Organized testing framework
-- Complete frontend implementation
-- Proper localization support
-- HACS compatibility
-
-The structure supports all the features outlined in the original specification while maintaining good code organization and maintainability.

@@ -58,3 +58,6 @@ ENV/
 
 .bash_history
 .zsh_history
+node_modules
+
+.github/

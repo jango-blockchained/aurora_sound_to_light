@@ -9,6 +9,8 @@ Transform your smart home into an intelligent nightclub with real-time music-rea
 [![GitHub Release][releases-shield]][releases]
 ![Project Maintenance][maintenance-shield]
 [![License][license-shield]](LICENSE.md)
+[![codecov](https://codecov.io/gh/OWNER/aurora-sound-to-light/branch/main/graph/badge.svg)](https://codecov.io/gh/OWNER/aurora-sound-to-light)
+[![Tests](https://github.com/OWNER/aurora-sound-to-light/workflows/Test%20Suite/badge.svg)](https://github.com/OWNER/aurora-sound-to-light/actions?query=workflow%3A%22Test+Suite%22)
 
 ## Features
 

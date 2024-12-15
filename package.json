@@ -1,0 +1,21 @@
+{
+    "name": "aurora-sound-to-light",
+    "version": "1.0.0",
+    "description": "Home Assistant integration for music-reactive lighting",
+    "scripts": {
+        "test": "web-test-runner",
+        "test:watch": "web-test-runner --watch",
+        "test:coverage": "web-test-runner --coverage"
+    },
+    "devDependencies": {
+        "@open-wc/testing": "^3.1.7",
+        "@web/dev-server-esbuild": "^0.4.1",
+        "@web/test-runner": "^0.15.1",
+        "@web/test-runner-playwright": "^0.10.0",
+        "chai": "^4.3.7",
+        "sinon": "^15.0.3"
+    },
+    "dependencies": {
+        "lit-element": "^2.4.0"
+    }
+}
