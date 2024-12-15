@@ -2,6 +2,7 @@ import "./aurora-dashboard.js";
 import "./aurora-effect-selector.js";
 import "./aurora-group-manager.js";
 import "./aurora-visualizer.js";
+import "./aurora-media-controls.js";
 
 window.customCards = window.customCards || [];
 window.customCards.push({

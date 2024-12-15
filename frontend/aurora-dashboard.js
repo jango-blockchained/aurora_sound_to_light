@@ -10,6 +10,7 @@ class AuroraDashboard extends LitElement {
       _audioData: { type: Object },
       _lightGroups: { type: Array },
       _metrics: { type: Object },
+      _selectedMediaPlayer: { type: String },
     };
   }
 
@@ -49,7 +50,7 @@ class AuroraDashboard extends LitElement {
         align-items: center;
         margin-bottom: 16px;
       }
-      h2 {
+      h2, h3 {
         margin: 0;
         color: var(--primary-text-color);
       }
@@ -78,6 +79,9 @@ class AuroraDashboard extends LitElement {
         font-size: 1.2em;
         font-weight: bold;
       }
+      .media-player-select {
+        margin-bottom: 16px;
+      }
     `;
   }
 
@@ -92,6 +96,7 @@ class AuroraDashboard extends LitElement {
       beatConfidence: 0,
       tempo: 0,
     };
+    this._selectedMediaPlayer = null;
   }
 
   render() {
@@ -102,9 +107,6 @@ class AuroraDashboard extends LitElement {
             <div class="header">
               <h2>Aurora Sound to Light</h2>
               <div class="button-row">
-                <mwc-button @click=${this._togglePlayback}>
-                  <ha-svg-icon path=${this._isPlaying ? mdiPause : mdiPlay}></ha-svg-icon>
-                </mwc-button>
                 <mwc-button @click=${this._openConfig}>
                   <ha-svg-icon path=${mdiCog}></ha-svg-icon>
                 </mwc-button>
@@ -117,6 +119,27 @@ class AuroraDashboard extends LitElement {
           </div>
           
           <div class="controls">
+            <div class="card">
+              <h3>Media Player</h3>
+              <div class="media-player-select">
+                <ha-select
+                  .label=${"Select Media Player"}
+                  .value=${this._selectedMediaPlayer}
+                  @selected=${this._handleMediaPlayerSelect}
+                >
+                  ${this._getMediaPlayerOptions()}
+                </ha-select>
+              </div>
+              ${this._selectedMediaPlayer
+                ? html`
+                    <aurora-media-controls
+                      .hass=${this.hass}
+                      .mediaPlayer=${this._selectedMediaPlayer}
+                    ></aurora-media-controls>
+                  `
+                : ""}
+            </div>
+            
             <div class="card">
               <h3>Active Effect</h3>
               <aurora-effect-selector
@@ -197,8 +220,31 @@ class AuroraDashboard extends LitElement {
     };
   }
 
-  async _togglePlayback() {
-    await this._hass.callService("aurora_sound_to_light", "toggle_audio", {});
+  _getMediaPlayerOptions() {
+    if (!this._hass) return html``;
+
+    const mediaPlayers = Object.entries(this._hass.states)
+      .filter(([entityId]) => entityId.startsWith("media_player."))
+      .map(([entityId, state]) => ({
+        value: entityId,
+        label: state.attributes.friendly_name || entityId,
+      }));
+
+    return mediaPlayers.map(
+      (player) => html`
+        <mwc-list-item .value=${player.value}>${player.label}</mwc-list-item>
+      `
+    );
+  }
+
+  async _handleMediaPlayerSelect(e) {
+    const mediaPlayer = e.target.value;
+    this._selectedMediaPlayer = mediaPlayer;
+    
+    // Update the integration's media player
+    await this._hass.callService("aurora_sound_to_light", "set_media_player", {
+      entity_id: mediaPlayer,
+    });
   }
 
   async _openConfig() {
