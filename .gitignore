@@ -23,9 +23,7 @@ home-assistant_v2.db.*
 ._*
 __pycache__
 .DS_Store
-__pycache__/
-.pytest_cache/
-*.pyc
+
 
 # Configuration files that may contain sensitive information
 secrets.yaml
