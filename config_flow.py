@@ -1,15 +1,15 @@
 """Config flow for Aurora Sound to Light."""
-from typing import Any, Dict, Optional
+from __future__ import annotations
 
 import logging
 import voluptuous as vol
+from typing import Any
 
 from homeassistant import config_entries
+from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import config_validation as cv
-from homeassistant.components.media_player import DOMAIN as MEDIA_PLAYER_DOMAIN
-from homeassistant.const import CONF_NAME
 
 from .const import (
     DOMAIN,
@@ -35,8 +35,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         """Initialize the config flow."""
-        self._data: Dict[str, Any] = {}
-        self._errors: Dict[str, str] = {}
+        self._data: dict[str, Any] = {}
+        self._errors: dict[str, str] = {}
 
     async def _async_get_media_players(self) -> list[str]:
         """Get list of available media players."""
@@ -54,7 +54,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self,
-        user_input: Optional[Dict[str, Any]] = None
+        user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle a flow initialized by the user."""
         errors = {}
@@ -81,7 +81,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_media_player(
         self,
-        user_input: Optional[Dict[str, Any]] = None
+        user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle media player selection."""
         errors = {}
@@ -107,7 +107,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_lights(
         self,
-        user_input: Optional[Dict[str, Any]] = None
+        user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle light selection."""
         errors = {}
@@ -152,7 +152,7 @@ class OptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(
         self,
-        user_input: Optional[Dict[str, Any]] = None
+        user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Manage the options."""
         if user_input is not None:

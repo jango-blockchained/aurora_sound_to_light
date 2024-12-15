@@ -4,11 +4,16 @@ DOMAIN = "aurora_sound_to_light"
 
 # Configuration
 CONF_AUDIO_INPUT = "audio_input"
+CONF_MEDIA_PLAYER = "media_player"
 CONF_BUFFER_SIZE = "buffer_size"
 CONF_LATENCY_THRESHOLD = "latency_threshold"
 CONF_LIGHT_GROUPS = "light_groups"
 CONF_EFFECT_TYPE = "effect_type"
 CONF_EFFECT_PARAMS = "effect_params"
+CONF_LIGHTS = "lights"
+
+# Default Values
+DEFAULT_NAME = "Aurora Sound to Light"
 
 # Audio input types
 AUDIO_INPUT_MIC = "microphone"
