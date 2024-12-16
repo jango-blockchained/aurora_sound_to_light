@@ -1,27 +1,35 @@
 {
     "name": "aurora-sound-to-light",
     "version": "1.0.0",
-    "description": "Home Assistant integration for music-reactive lighting",
+    "description": "Home Assistant custom component for sound-reactive lighting effects",
     "scripts": {
         "test": "web-test-runner",
+        "test:unit": "web-test-runner tests/frontend/unit/**/*.test.js --coverage",
+        "test:integration": "web-test-runner tests/frontend/integration/**/*.integration.test.js",
+        "test:e2e": "web-test-runner tests/frontend/e2e/**/*.e2e.test.js",
         "test:watch": "web-test-runner --watch",
-        "test:coverage": "web-test-runner --coverage"
+        "test:coverage": "web-test-runner --coverage",
+        "lint": "eslint 'frontend/**/*.js'",
+        "format": "prettier --write 'frontend/**/*.{js,css}'"
+    },
+    "dependencies": {
+        "@material/mwc-button": "^0.27.0",
+        "@material/mwc-icon-button": "^0.27.0",
+        "@material/mwc-list": "^0.27.0",
+        "@material/mwc-menu": "^0.27.0",
+        "chart.js": "^4.0.0",
+        "lit": "^2.7.0"
     },
     "devDependencies": {
         "@open-wc/testing": "^3.1.7",
-        "@testing-library/dom": "^10.4.0",
-        "@testing-library/jest-dom": "^6.6.3",
         "@web/dev-server-esbuild": "^0.4.1",
         "@web/test-runner": "^0.15.1",
         "@web/test-runner-playwright": "^0.10.0",
-        "chai": "^4.3.7",
-        "chartjs-adapter-date-fns": "^3.0.0",
-        "date-fns": "^4.1.0",
-        "jest-canvas-mock": "^2.5.2",
-        "sinon": "^15.0.3"
+        "@web/dev-server-import-maps": "^0.1.1",
+        "eslint": "^8.0.0",
+        "prettier": "^2.8.0",
+        "sinon": "^15.0.0"
     },
-    "dependencies": {
-        "chart.js": "^4.4.1",
-        "lit-element": "^2.4.0"
-    }
+    "author": "Your Name",
+    "license": "MIT"
 }
