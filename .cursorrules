@@ -1,11 +1,10 @@
-- Always check the project structure and files before creating new files.
-- Also update the `_files.md` file with the new file.
-- Always check the `_files.md` file before creating new files.
-- Always check `_tasks.md` file before creating and on finishing new tasks.
-
-- Keep in mind that homeassiatnt is running in a docker container called `homeassistant`.
-- This project is part of the injected directory.
-- From inside the Container, the project is located at /config/custom_components/aurora_sound_to_light.
-- The project is mounted as a volume in the container, so any changes made to the files in the project directory will be reflected in the container.
-- Always add the `@` symbol to the beginning of the file name when referring to it.
-- Always git commit all changes to the project.
+- Verify project structure and files before creating new files.
+- Update `_files.md` with new files.
+- Check `_files.md` before creating new files.
+- Review `_tasks.md` before starting and after finishing tasks.
+- Remember, Home Assistant runs in a Docker container named `homeassistant`.
+- The project is part of the injected directory.
+- Inside the container, the project is at /config/custom_components/aurora_sound_to_light.
+- The project is volume-mounted, so file changes reflect in the container.
+- Prefix file names with `@` when referencing them.
+- Commit all project changes to git.
