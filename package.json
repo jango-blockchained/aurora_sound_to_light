@@ -23,9 +23,10 @@
     "devDependencies": {
         "@open-wc/testing": "^3.1.7",
         "@web/dev-server-esbuild": "^0.4.1",
+        "@web/dev-server-import-maps": "^0.1.1",
         "@web/test-runner": "^0.15.1",
         "@web/test-runner-playwright": "^0.10.0",
-        "@web/dev-server-import-maps": "^0.1.1",
+        "chartjs-adapter-date-fns": "^3.0.0",
         "eslint": "^8.0.0",
         "prettier": "^2.8.0",
         "sinon": "^15.0.0"

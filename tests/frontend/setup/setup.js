@@ -88,17 +88,19 @@ const mockCanvasContext = {
 };
 
 // Mock canvas
-HTMLCanvasElement.prototype.getContext = () => mockCanvasContext;
+if (typeof window !== 'undefined') {
+    HTMLCanvasElement.prototype.getContext = () => mockCanvasContext;
 
-// Mock ResizeObserver
-global.ResizeObserver = class ResizeObserver {
-    constructor(callback) {
-        this.callback = callback;
-    }
-    observe() { }
-    unobserve() { }
-    disconnect() { }
-};
+    // Mock ResizeObserver
+    window.ResizeObserver = class ResizeObserver {
+        constructor(callback) {
+            this.callback = callback;
+        }
+        observe() { }
+        unobserve() { }
+        disconnect() { }
+    };
+}
 
 // Helper to wait for element updates
 export const waitForElement = async (element) => {

@@ -1,32 +1,28 @@
-import { fixture, html, expect, waitUntil } from '@open-wc/testing';
-import '../aurora-performance-monitor.js';
+import { fixture, html, expect } from '@open-wc/testing';
+import { testUtils } from '../setup/setup.js';
+import sinon from 'sinon';
+import '../../../frontend/aurora-performance-monitor.js';
 
 describe('AuroraPerformanceMonitor', () => {
     let element;
     let mockHass;
 
     beforeEach(async () => {
-        // Mock Home Assistant connection
-        mockHass = {
-            callWS: jest.fn().mockImplementation(async (params) => {
-                if (params.type === 'get_metrics') {
-                    return {
-                        latency: 50,
-                        cpuUsage: 25,
-                        memoryUsage: 30,
-                        timestamp: Date.now()
-                    };
-                }
-                throw new Error('Unknown WebSocket command');
-            }),
-            callService: jest.fn(),
-            connection: {
-                subscribeEvents: jest.fn(),
-                addEventListener: jest.fn()
+        mockHass = testUtils.createMockHass();
+        mockHass.callWS = async (params) => {
+            if (params.type === 'aurora_sound_to_light/get_metrics') {
+                return {
+                    latency: 50,
+                    cpuUsage: 25,
+                    memoryUsage: 30,
+                    audioBufferHealth: 95,
+                    systemStatus: 'good',
+                    timestamp: Date.now()
+                };
             }
+            throw new Error('Unknown WebSocket command');
         };
 
-        // Create element with mocked Home Assistant
         element = await fixture(html`<aurora-performance-monitor></aurora-performance-monitor>`);
         element.hass = mockHass;
         await element.updateComplete;
@@ -47,104 +43,107 @@ describe('AuroraPerformanceMonitor', () => {
             element._chart.destroy();
             element._chart = null;
         }
-        jest.clearAllMocks();
-        jest.clearAllTimers();
     });
 
-    test('initializes with default values', () => {
-        expect(element._metrics).toEqual({
+    it('initializes with default values', () => {
+        expect(element._metrics).to.deep.equal({
             latency: 0,
             cpuUsage: 0,
             memoryUsage: 0,
-            timestamp: expect.any(Number)
+            audioBufferHealth: 100,
+            systemStatus: 'good',
+            timestamp: element._metrics.timestamp
         });
-        expect(element._expanded).toBe(false);
-        expect(element._showChart).toBe(false);
-        expect(element._history).toBeDefined();
-        expect(element._history.timestamps).toEqual([]);
+        expect(element._expanded).to.be.false;
+        expect(element._showChart).to.be.false;
+        expect(element._historyData).to.exist;
+        expect(element._historyData.timestamps).to.be.an('array').that.is.empty;
     });
 
-    test('updates metrics via WebSocket', async () => {
+    it('updates metrics via WebSocket', async () => {
         await element._updateMetrics();
-        expect(element._metrics).toEqual({
+        expect(element._metrics).to.deep.equal({
             latency: 50,
             cpuUsage: 25,
             memoryUsage: 30,
-            timestamp: expect.any(Number)
+            audioBufferHealth: 95,
+            systemStatus: 'good',
+            timestamp: element._metrics.timestamp
         });
     });
 
-    test('handles WebSocket errors gracefully', async () => {
-        const errorSpy = jest.spyOn(console, 'error');
-        mockHass.callWS.mockRejectedValueOnce(new Error('WebSocket error'));
+    it('handles WebSocket errors gracefully', async () => {
+        mockHass.callWS = async () => {
+            throw new Error('WebSocket error');
+        };
 
         await element._updateMetrics();
-
-        expect(errorSpy).toHaveBeenCalledWith(
-            'Failed to update metrics:',
-            expect.any(Error)
-        );
+        const errorElement = element.shadowRoot.querySelector('.error-message');
+        expect(errorElement).to.exist;
+        expect(errorElement.textContent).to.include('WebSocket error');
     });
 
-    test('calculates status classes correctly', () => {
-        expect(element._getStatusClass(50, { medium: 100, high: 200 })).toBe('status-normal');
-        expect(element._getStatusClass(150, { medium: 100, high: 200 })).toBe('status-medium');
-        expect(element._getStatusClass(250, { medium: 100, high: 200 })).toBe('status-high');
+    it('calculates status classes correctly', () => {
+        expect(element._getStatusClass(50, { medium: 100, high: 200 })).to.equal('status-normal');
+        expect(element._getStatusClass(150, { medium: 100, high: 200 })).to.equal('status-medium');
+        expect(element._getStatusClass(250, { medium: 100, high: 200 })).to.equal('status-high');
     });
 
-    test('renders metric cards with correct values', async () => {
+    it('renders metric cards with correct values', async () => {
         await element._updateMetrics();
         await element.updateComplete;
 
         const metrics = element.shadowRoot.querySelectorAll('.metric');
-        expect(metrics.length).toBe(3);
+        expect(metrics.length).to.equal(4); // Including audio buffer health
 
         const values = Array.from(metrics).map(metric =>
             metric.querySelector('.value').textContent.trim()
         );
 
-        expect(values).toEqual(['50ms', '25%', '30%']);
+        expect(values).to.deep.equal(['50ms', '25%', '30%', '95%']);
     });
 
-    test('updates metrics periodically', async () => {
-        const updateSpy = jest.spyOn(element, '_updateMetrics');
+    it('updates metrics periodically', async () => {
+        const updateSpy = sinon.spy(element, '_updateMetrics');
         element._startMetricsUpdate();
 
-        expect(updateSpy).toHaveBeenCalledTimes(1);
+        expect(updateSpy.callCount).to.equal(1);
 
         // Fast-forward time
-        jest.advanceTimersByTime(5000);
-        expect(updateSpy).toHaveBeenCalledTimes(2);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        expect(updateSpy.callCount).to.be.greaterThan(1);
     });
 
-    test('cleans up interval on disconnect', () => {
+    it('cleans up interval on disconnect', () => {
         element._startMetricsUpdate();
-        expect(element._updateInterval).toBeTruthy();
+        expect(element._updateInterval).to.exist;
 
         element.disconnectedCallback();
-        expect(element._updateInterval).toBeNull();
+        expect(element._updateInterval).to.be.null;
     });
 
-    test('toggles expanded state and chart visibility', async () => {
-        expect(element._expanded).toBe(false);
-        expect(element.shadowRoot.querySelector('.chart-container')).toBeFalsy();
+    it('toggles expanded state and chart visibility', async () => {
+        expect(element._expanded).to.be.false;
+        expect(element.shadowRoot.querySelector('.chart-container')).to.not.exist;
 
-        const header = element.shadowRoot.querySelector('.header');
+        const header = element.shadowRoot.querySelector('.card-header');
         header.click();
         await element.updateComplete;
 
-        expect(element._expanded).toBe(true);
+        expect(element._expanded).to.be.true;
         const chartContainer = element.shadowRoot.querySelector('.chart-container');
-        expect(chartContainer).toBeTruthy();
-        expect(chartContainer.querySelector('#performanceChart')).toBeTruthy();
+        expect(chartContainer).to.exist;
+        expect(chartContainer.querySelector('#performanceChart')).to.exist;
     });
 
-    test('updates history data within limits', () => {
+    it('updates history data within limits', () => {
         const maxLength = element._maxHistoryLength;
         const metrics = {
             latency: 50,
             cpuUsage: 25,
             memoryUsage: 30,
+            audioBufferHealth: 95,
+            systemStatus: 'good',
             timestamp: Date.now()
         };
 
@@ -156,62 +155,62 @@ describe('AuroraPerformanceMonitor', () => {
             });
         }
 
-        expect(element._history.timestamps.length).toBe(maxLength);
-        expect(element._history.latency.length).toBe(maxLength);
-        expect(element._history.cpuUsage.length).toBe(maxLength);
-        expect(element._history.memoryUsage.length).toBe(maxLength);
+        expect(element._historyData.timestamps.length).to.equal(maxLength);
+        expect(element._historyData.latency.length).to.equal(maxLength);
+        expect(element._historyData.cpuUsage.length).to.equal(maxLength);
+        expect(element._historyData.memoryUsage.length).to.equal(maxLength);
     });
 
-    test('initializes and updates chart correctly', async () => {
+    it('initializes and updates chart correctly', async () => {
         element._expanded = true;
         await element.updateComplete;
 
         const chartContainer = element.shadowRoot.querySelector('.chart-container');
-        expect(chartContainer).toBeTruthy();
+        expect(chartContainer).to.exist;
 
         const canvas = chartContainer.querySelector('#performanceChart');
-        expect(canvas).toBeTruthy();
+        expect(canvas).to.exist;
 
         await element._initChart();
-        expect(element._chart).toBeTruthy();
+        expect(element._chart).to.exist;
 
         // Update metrics and check if chart is updated
         await element._updateMetrics();
-        expect(element._chart.update).toHaveBeenCalled();
+        expect(element._chart.data.datasets[0].data).to.deep.equal(element._historyData.latency);
     });
 
-    test('cleans up chart on collapse', async () => {
+    it('cleans up chart on collapse', async () => {
         // First expand
         element._expanded = true;
         await element.updateComplete;
         await element._initChart();
-        expect(element._chart).toBeTruthy();
+        expect(element._chart).to.exist;
 
         // Then collapse
         element._expanded = false;
         await element.updateComplete;
 
-        expect(element._chart).toBeNull();
-        expect(element.shadowRoot.querySelector('.chart-container')).toBeFalsy();
+        expect(element._chart).to.be.null;
+        expect(element.shadowRoot.querySelector('.chart-container')).to.not.exist;
     });
 
-    test('handles missing hass object gracefully', async () => {
+    it('handles missing hass object gracefully', async () => {
         element.hass = null;
         await element.updateComplete;
 
         const content = element.shadowRoot.textContent;
-        expect(content).toContain('Loading');
+        expect(content).to.include('Loading');
     });
 
-    test('updates on hass property change', async () => {
-        const updateSpy = jest.spyOn(element, '_updateMetrics');
+    it('updates on hass property change', async () => {
+        const updateSpy = sinon.spy(element, '_updateMetrics');
         element.hass = { ...mockHass };
         await element.updateComplete;
 
-        expect(updateSpy).toHaveBeenCalled();
+        expect(updateSpy.calledOnce).to.be.true;
     });
 
-    test('handles chart initialization failure gracefully', async () => {
+    it('handles chart initialization failure gracefully', async () => {
         element._expanded = true;
         await element.updateComplete;
 
@@ -220,26 +219,28 @@ describe('AuroraPerformanceMonitor', () => {
         canvas.remove();
 
         await element._initChart();
-        expect(element._chart).toBeFalsy();
+        expect(element._chart).to.not.exist;
     });
 
-    test('handles history initialization', () => {
+    it('handles history initialization', () => {
         // Force history to be undefined
-        element._history = undefined;
+        element._historyData = undefined;
 
         const metrics = {
             latency: 50,
             cpuUsage: 25,
             memoryUsage: 30,
+            audioBufferHealth: 95,
+            systemStatus: 'good',
             timestamp: Date.now()
         };
 
         element._updateHistory(metrics);
 
-        expect(element._history).toBeDefined();
-        expect(element._history.timestamps.length).toBe(1);
-        expect(element._history.latency).toEqual([50]);
-        expect(element._history.cpuUsage).toEqual([25]);
-        expect(element._history.memoryUsage).toEqual([30]);
+        expect(element._historyData).to.exist;
+        expect(element._historyData.timestamps.length).to.equal(1);
+        expect(element._historyData.latency).to.deep.equal([50]);
+        expect(element._historyData.cpuUsage).to.deep.equal([25]);
+        expect(element._historyData.memoryUsage).to.deep.equal([30]);
     });
 }); 

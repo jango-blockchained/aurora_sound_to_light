@@ -1,14 +1,18 @@
-import { esbuildPlugin } from '@web/dev-server-esbuild';
-import { playwrightLauncher } from '@web/test-runner-playwright';
-import { importMapsPlugin } from '@web/dev-server-import-maps';
+const { esbuildPlugin } = require('@web/dev-server-esbuild');
+const { playwrightLauncher } = require('@web/test-runner-playwright');
+const { importMapsPlugin } = require('@web/dev-server-import-maps');
 
-export default {
+module.exports = {
   files: [
     'tests/frontend/unit/**/*.test.js',
     'tests/frontend/integration/**/*.integration.test.js',
     'tests/frontend/e2e/**/*.e2e.test.js'
   ],
-  nodeResolve: true,
+  nodeResolve: {
+    exportConditions: ['browser', 'development'],
+    moduleDirectories: ['node_modules'],
+    browser: true
+  },
   coverage: true,
   coverageConfig: {
     reportDir: 'coverage',
@@ -44,7 +48,7 @@ export default {
       inject: {
         importMap: {
           imports: {
-            '@open-wc/testing': '/node_modules/@open-wc/testing/index.js'
+            'sinon': '/node_modules/sinon/pkg/sinon-esm.js'
           }
         }
       }
@@ -58,17 +62,17 @@ export default {
     }
   },
   testRunnerHtml: testFramework => `
-        <html>
-            <head>
-                <script type="module">
-                    window.process = { env: { NODE_ENV: 'test' } };
-                </script>
-            </head>
-            <body>
-                <script type="module" src="${testFramework}"></script>
-            </body>
-        </html>
-    `,
+    <html>
+      <head>
+        <script type="module">
+          window.process = { env: { NODE_ENV: 'test' } };
+        </script>
+      </head>
+      <body>
+        <script type="module" src="${testFramework}"></script>
+      </body>
+    </html>
+  `,
   middleware: [
     function rewriteBase(context, next) {
       if (context.url.startsWith('/base/')) {
@@ -79,10 +83,5 @@ export default {
   ],
   mimeTypes: {
     '**/*.js': 'js'
-  },
-  nodeResolve: {
-    exportConditions: ['browser', 'development'],
-    moduleDirectories: ['node_modules']
-  },
-  preserveSymlinks: true
+  }
 }; 
