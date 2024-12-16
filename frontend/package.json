@@ -1,0 +1,24 @@
+{
+    "name": "aurora-sound-to-light-frontend",
+    "version": "1.0.0",
+    "description": "Frontend components for Aurora Sound to Light",
+    "scripts": {
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
+        "test:e2e": "jest --config jest.e2e.config.js",
+        "lint": "eslint ."
+    },
+    "devDependencies": {
+        "@babel/core": "^7.22.0",
+        "@babel/preset-env": "^7.22.0",
+        "@open-wc/testing": "^4.0.0",
+        "@testing-library/dom": "^9.3.0",
+        "@testing-library/jest-dom": "^5.16.5",
+        "@web/test-runner": "^0.19.0",
+        "babel-jest": "^29.5.0",
+        "eslint": "^8.41.0",
+        "jest": "^29.5.0",
+        "jest-environment-jsdom": "^29.7.0"
+    }
+}

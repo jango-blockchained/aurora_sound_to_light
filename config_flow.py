@@ -61,6 +61,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
+                self._data.update(user_input)
                 media_players = await self._async_get_media_players()
                 if not media_players:
                     errors["base"] = "no_media_players"

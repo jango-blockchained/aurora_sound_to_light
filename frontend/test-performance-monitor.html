@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Aurora Performance Monitor Tests</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f0f0f0;
+        }
+
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .test-controls {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .test-controls button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .test-controls button:hover {
+            background: #0056b3;
+        }
+
+        .test-controls button.warning {
+            background: #ffc107;
+        }
+
+        .test-controls button.danger {
+            background: #dc3545;
+        }
+
+        .test-summary {
+            margin: 20px 0;
+            padding: 20px;
+            background: #e9ecef;
+            border-radius: 4px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+
+        .summary-item {
+            text-align: center;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .summary-item .value {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 8px 0;
+        }
+
+        .summary-item .label {
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .test-results {
+            margin: 20px 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .scenario-card {
+            padding: 16px;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .scenario-card.passed {
+            border-left: 4px solid #28a745;
+        }
+
+        .scenario-card.failed {
+            border-left: 4px solid #dc3545;
+        }
+
+        .scenario-card.warning {
+            border-left: 4px solid #ffc107;
+        }
+
+        .scenario-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .scenario-name {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .scenario-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-passed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .metric-list {
+            margin: 12px 0;
+            font-size: 14px;
+        }
+
+        .metric-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .warning-list,
+        .error-list {
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .warning-item,
+        .error-item {
+            padding: 4px 8px;
+            margin: 4px 0;
+            border-radius: 2px;
+        }
+
+        .warning-item {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .error-item {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .test-log {
+            margin-top: 20px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .test-log .entry {
+            margin: 4px 0;
+            padding: 4px 8px;
+            border-left: 3px solid #007bff;
+            font-size: 12px;
+        }
+
+        .test-log .error {
+            border-left-color: #dc3545;
+            color: #dc3545;
+        }
+
+        .test-log .success {
+            border-left-color: #28a745;
+            color: #28a745;
+        }
+
+        .test-log .warning {
+            border-left-color: #ffc107;
+            color: #856404;
+        }
+
+        #monitor-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .download-report {
+            margin-top: 20px;
+            text-align: right;
+        }
+
+        .download-report button {
+            padding: 8px 16px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .download-report button:hover {
+            background: #218838;
+        }
+
+        @media (max-width: 768px) {
+            .test-controls {
+                flex-direction: column;
+            }
+
+            .test-controls button {
+                width: 100%;
+            }
+
+            .test-summary {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="test-container">
+        <h1>Aurora Performance Monitor Tests</h1>
+
+        <div class="test-controls">
+            <button onclick="window.testPerformanceMonitor.runTests()">Run All Tests</button>
+            <button onclick="runScenario('Normal Operation')">Test Normal Operation</button>
+            <button onclick="runScenario('High CPU Load')" class="warning">Test High CPU Load</button>
+            <button onclick="runScenario('Network Issues')" class="warning">Test Network Issues</button>
+            <button onclick="runScenario('Critical System Load')" class="danger">Test Critical Load</button>
+        </div>
+
+        <div class="test-summary" id="testSummary">
+            <div class="summary-item">
+                <div class="value" id="totalTests">0</div>
+                <div class="label">Total Tests</div>
+            </div>
+            <div class="summary-item">
+                <div class="value" id="passedTests">0</div>
+                <div class="label">Passed</div>
+            </div>
+            <div class="summary-item">
+                <div class="value" id="failedTests">0</div>
+                <div class="label">Failed</div>
+            </div>
+            <div class="summary-item">
+                <div class="value" id="warningCount">0</div>
+                <div class="label">Warnings</div>
+            </div>
+        </div>
+
+        <div class="test-results" id="testResults"></div>
+
+        <div id="monitor-container"></div>
+
+        <div class="test-log" id="testLog"></div>
+
+        <div class="download-report">
+            <button onclick="downloadLatestReport()">
+                <span>Download Test Report</span>
+                <svg width="16" height="16" viewBox="0 0 16 16">
+                    <path fill="currentColor" d="M8 12l-4-4h2.5V3h3v5H12L8 12zm-6 2h12v-2H2v2z" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        import './aurora-performance-monitor.js';
+        import './test-performance-monitor.js';
+
+        window.runScenario = async (scenarioName) => {
+            const scenario = window.testPerformanceMonitor.testScenarios.find(s => s.name === scenarioName);
+            if (!scenario) {
+                logMessage(`Scenario not found: ${scenarioName}`, 'error');
+                return;
+            }
+
+            const mockHass = new window.testPerformanceMonitor.MockHomeAssistant();
+            const container = document.getElementById('monitor-container');
+            container.innerHTML = '';
+
+            const monitor = document.createElement('aurora-performance-monitor');
+            monitor.hass = mockHass;
+            container.appendChild(monitor);
+
+            logMessage(`Running scenario: ${scenarioName}`);
+            scenario.setup(mockHass);
+
+            await new Promise(resolve => setTimeout(resolve, scenario.duration));
+            const result = scenario.validate(mockHass.metrics, monitor);
+            updateTestResults(scenarioName, result);
+            logMessage(`Completed scenario: ${scenarioName}`, result.status === 'passed' ? 'success' : 'error');
+        };
+
+        function updateTestResults(scenarioName, result) {
+            const resultsContainer = document.getElementById('testResults');
+            const card = document.createElement('div');
+            card.className = `scenario-card ${result.status}`;
+
+            card.innerHTML = `
+                <div class="scenario-header">
+                    <div class="scenario-name">${scenarioName}</div>
+                    <div class="scenario-status status-${result.status}">${result.status.toUpperCase()}</div>
+                </div>
+                <div class="metric-list">
+                    ${Object.entries(result.metrics).map(([key, value]) => `
+                        <div class="metric-item">
+                            <span>${key}</span>
+                            <span>${typeof value === 'number' ? value.toFixed(2) : value}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                ${result.warnings.length > 0 ? `
+                    <div class="warning-list">
+                        ${result.warnings.map(w => `<div class="warning-item">${w}</div>`).join('')}
+                    </div>
+                ` : ''}
+                ${result.errors.length > 0 ? `
+                    <div class="error-list">
+                        ${result.errors.map(e => `<div class="error-item">${e}</div>`).join('')}
+                    </div>
+                ` : ''}
+            `;
+
+            resultsContainer.appendChild(card);
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const cards = document.querySelectorAll('.scenario-card');
+            const total = cards.length;
+            const passed = document.querySelectorAll('.scenario-card.passed').length;
+            const failed = document.querySelectorAll('.scenario-card.failed').length;
+            const warnings = Array.from(document.querySelectorAll('.warning-item')).length;
+
+            document.getElementById('totalTests').textContent = total;
+            document.getElementById('passedTests').textContent = passed;
+            document.getElementById('failedTests').textContent = failed;
+            document.getElementById('warningCount').textContent = warnings;
+        }
+
+        function logMessage(message, type = 'info') {
+            const log = document.getElementById('testLog');
+            const entry = document.createElement('div');
+            entry.className = `entry ${type}`;
+            entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        window.downloadLatestReport = () => {
+            if (window.testPerformanceMonitor.mockHass?.logger) {
+                window.testPerformanceMonitor.mockHass.logger.saveReport();
+            } else {
+                logMessage('No test results available', 'error');
+            }
+        };
+
+        // Override console.log for test output
+        const originalLog = console.log;
+        console.log = (...args) => {
+            originalLog.apply(console, args);
+            logMessage(args.join(' '));
+        };
+    </script>
+</body>
+
+</html>

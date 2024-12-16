@@ -1,135 +1,18 @@
-import {
-    LitElement,
-    html,
-    css,
-} from "lit-element";
-import { Chart } from 'chart.js/auto';
+import { LitElement, html, css } from 'lit';
+import { Chart, registerables } from 'chart.js';
+import 'chartjs-adapter-date-fns';
 
-class AuroraPerformanceMonitor extends LitElement {
+Chart.register(...registerables);
+
+export class AuroraPerformanceMonitor extends LitElement {
     static get properties() {
         return {
             hass: { type: Object },
-            _metrics: { type: Object },
-            _updateInterval: { type: Number },
-            _historyData: { type: Array },
-            _chart: { type: Object },
-            _expanded: { type: Boolean },
+            _metrics: { type: Object, state: true },
+            _expanded: { type: Boolean, state: true },
+            _showChart: { type: Boolean, state: true },
+            _updateInterval: { type: Number, state: true }
         };
-    }
-
-    static get styles() {
-        return css`
-            :host {
-                display: block;
-                padding: 16px;
-                background: var(--card-background-color);
-                border-radius: var(--ha-card-border-radius);
-            }
-            .metrics-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 16px;
-                margin-bottom: 16px;
-            }
-            .metric-card {
-                background: var(--primary-background-color);
-                padding: 16px;
-                border-radius: 8px;
-                text-align: center;
-                transition: transform 0.2s ease-in-out;
-                cursor: pointer;
-            }
-            .metric-card:hover {
-                transform: translateY(-2px);
-            }
-            .metric-value {
-                font-size: 24px;
-                font-weight: bold;
-                margin: 8px 0;
-            }
-            .metric-label {
-                font-size: 14px;
-                color: var(--secondary-text-color);
-            }
-            .status-indicator {
-                width: 12px;
-                height: 12px;
-                border-radius: 50%;
-                display: inline-block;
-                margin-right: 8px;
-                transition: background-color 0.3s ease;
-            }
-            .status-good {
-                background-color: var(--success-color);
-            }
-            .status-warning {
-                background-color: var(--warning-color);
-            }
-            .status-error {
-                background-color: var(--error-color);
-            }
-            .chart-container {
-                height: 0;
-                overflow: hidden;
-                transition: height 0.3s ease-in-out;
-            }
-            .chart-container.expanded {
-                height: 300px;
-                margin-top: 16px;
-            }
-            .chart-wrapper {
-                position: relative;
-                height: 100%;
-            }
-            .controls {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-top: 16px;
-            }
-            .button {
-                background: var(--primary-color);
-                color: var(--text-primary-color);
-                padding: 8px 16px;
-                border-radius: 4px;
-                border: none;
-                cursor: pointer;
-                transition: background 0.2s ease;
-            }
-            .button:hover {
-                background: var(--primary-color-light);
-            }
-            .tooltip {
-                position: absolute;
-                background: var(--card-background-color);
-                padding: 8px;
-                border-radius: 4px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                display: none;
-            }
-            .metric-card:hover .tooltip {
-                display: block;
-            }
-            .optimization-tips {
-                margin-top: 16px;
-                padding: 16px;
-                background: var(--primary-background-color);
-                border-radius: 8px;
-                display: none;
-            }
-            .optimization-tips.show {
-                display: block;
-            }
-            .tip-item {
-                margin: 8px 0;
-                display: flex;
-                align-items: center;
-            }
-            .tip-icon {
-                margin-right: 8px;
-                color: var(--primary-color);
-            }
-        `;
     }
 
     constructor() {
@@ -138,132 +21,136 @@ class AuroraPerformanceMonitor extends LitElement {
             latency: 0,
             cpuUsage: 0,
             memoryUsage: 0,
-            audioBufferHealth: 100,
-            systemStatus: 'good'
-        };
-        this._updateInterval = null;
-        this._historyData = {
-            latency: [],
-            cpuUsage: [],
-            memoryUsage: [],
-            audioBufferHealth: [],
-            timestamps: []
+            timestamp: Date.now()
         };
         this._expanded = false;
+        this._showChart = false;
+        this._updateInterval = null;
+        this._history = {
+            timestamps: [],
+            latency: [],
+            cpuUsage: [],
+            memoryUsage: []
+        };
+        this._maxHistoryLength = 50;
         this._chart = null;
+    }
+
+    updated(changedProperties) {
+        super.updated(changedProperties);
+        if (changedProperties.has('hass') && this.hass) {
+            if (!this._updateInterval) {
+                this._startMetricsUpdate();
+            }
+        }
     }
 
     connectedCallback() {
         super.connectedCallback();
-        this._startMetricsUpdate();
+        if (this.hass) {
+            this._startMetricsUpdate();
+        }
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
-        if (this._updateInterval) {
-            clearInterval(this._updateInterval);
-        }
+        this._stopMetricsUpdate();
         if (this._chart) {
             this._chart.destroy();
+            this._chart = null;
         }
     }
 
-    async _startMetricsUpdate() {
-        await this._updateMetrics();
-        this._updateInterval = setInterval(() => this._updateMetrics(), 1000);
+    _startMetricsUpdate() {
+        if (!this.hass) return;
+        this._updateMetrics();
+        this._updateInterval = setInterval(() => {
+            this._updateMetrics();
+        }, 5000);
+    }
+
+    _stopMetricsUpdate() {
+        if (this._updateInterval) {
+            clearInterval(this._updateInterval);
+            this._updateInterval = null;
+        }
     }
 
     async _updateMetrics() {
         if (!this.hass) return;
 
         try {
-            const response = await this.hass.callWS({
-                type: 'aurora_sound_to_light/get_metrics'
+            const metrics = await this.hass.callWS({
+                type: 'get_metrics'
             });
 
             this._metrics = {
-                ...this._metrics,
-                ...response
+                latency: metrics.latency,
+                cpuUsage: metrics.cpuUsage,
+                memoryUsage: metrics.memoryUsage,
+                timestamp: metrics.timestamp
             };
 
-            // Update history data
-            const timestamp = new Date();
-            this._historyData.timestamps.push(timestamp);
-            this._historyData.latency.push(this._metrics.latency);
-            this._historyData.cpuUsage.push(this._metrics.cpuUsage);
-            this._historyData.memoryUsage.push(this._metrics.memoryUsage);
-            this._historyData.audioBufferHealth.push(this._metrics.audioBufferHealth);
+            this._updateHistory(this._metrics);
 
-            // Keep last 60 seconds of data
-            if (this._historyData.timestamps.length > 60) {
-                this._historyData.timestamps.shift();
-                this._historyData.latency.shift();
-                this._historyData.cpuUsage.shift();
-                this._historyData.memoryUsage.shift();
-                this._historyData.audioBufferHealth.shift();
-            }
-
-            if (this._expanded) {
+            if (this._expanded && this._chart) {
                 this._updateChart();
             }
 
             this.requestUpdate();
         } catch (error) {
-            console.error('Failed to fetch metrics:', error);
+            console.error('Failed to update metrics:', error);
+            this.dispatchEvent(new CustomEvent('error', {
+                detail: { message: error.message }
+            }));
+        }
+    }
+
+    _updateHistory(metrics) {
+        if (!this._history) {
+            this._history = {
+                timestamps: [],
+                latency: [],
+                cpuUsage: [],
+                memoryUsage: []
+            };
+        }
+
+        this._history.timestamps.push(new Date(metrics.timestamp));
+        this._history.latency.push(metrics.latency);
+        this._history.cpuUsage.push(metrics.cpuUsage);
+        this._history.memoryUsage.push(metrics.memoryUsage);
+
+        if (this._history.timestamps.length > this._maxHistoryLength) {
+            this._history.timestamps.shift();
+            this._history.latency.shift();
+            this._history.cpuUsage.shift();
+            this._history.memoryUsage.shift();
         }
     }
 
     _getStatusClass(value, thresholds) {
-        if (value >= thresholds.error) return 'status-error';
-        if (value >= thresholds.warning) return 'status-warning';
-        return 'status-good';
-    }
-
-    _getOptimizationTips() {
-        const tips = [];
-
-        if (this._metrics.latency > 50) {
-            tips.push({
-                icon: '⚡',
-                text: 'High latency detected. Try reducing the buffer size or check network connectivity.'
-            });
-        }
-
-        if (this._metrics.cpuUsage > 70) {
-            tips.push({
-                icon: '🔄',
-                text: 'High CPU usage. Consider reducing the number of active effects or frequency bands.'
-            });
-        }
-
-        if (this._metrics.memoryUsage > 80) {
-            tips.push({
-                icon: '💾',
-                text: 'High memory usage. Try closing unused browser tabs or applications.'
-            });
-        }
-
-        if (this._metrics.audioBufferHealth < 90) {
-            tips.push({
-                icon: '🎵',
-                text: 'Audio buffer health is low. Check audio input settings and system resources.'
-            });
-        }
-
-        return tips;
+        if (value >= thresholds.high) return 'status-high';
+        if (value >= thresholds.medium) return 'status-medium';
+        return 'status-normal';
     }
 
     _toggleExpanded() {
         this._expanded = !this._expanded;
         if (this._expanded) {
-            this._initChart();
+            this.updateComplete.then(() => this._initChart());
+        } else if (this._chart) {
+            this._chart.destroy();
+            this._chart = null;
         }
         this.requestUpdate();
     }
 
-    _initChart() {
-        const ctx = this.shadowRoot.querySelector('#performanceChart').getContext('2d');
+    async _initChart() {
+        const canvas = this.shadowRoot.querySelector('#performanceChart');
+        if (!canvas) return;
 
+        const ctx = canvas.getContext('2d');
         if (this._chart) {
             this._chart.destroy();
         }
@@ -271,30 +158,24 @@ class AuroraPerformanceMonitor extends LitElement {
         this._chart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: this._historyData.timestamps.map(t => t.toLocaleTimeString()),
+                labels: this._history.timestamps,
                 datasets: [
                     {
                         label: 'Latency (ms)',
-                        data: this._historyData.latency,
+                        data: this._history.latency,
                         borderColor: 'rgb(75, 192, 192)',
                         tension: 0.1
                     },
                     {
                         label: 'CPU Usage (%)',
-                        data: this._historyData.cpuUsage,
+                        data: this._history.cpuUsage,
                         borderColor: 'rgb(255, 99, 132)',
                         tension: 0.1
                     },
                     {
                         label: 'Memory Usage (%)',
-                        data: this._historyData.memoryUsage,
-                        borderColor: 'rgb(255, 205, 86)',
-                        tension: 0.1
-                    },
-                    {
-                        label: 'Buffer Health (%)',
-                        data: this._historyData.audioBufferHealth,
-                        borderColor: 'rgb(54, 162, 235)',
+                        data: this._history.memoryUsage,
+                        borderColor: 'rgb(153, 102, 255)',
                         tension: 0.1
                     }
                 ]
@@ -302,12 +183,35 @@ class AuroraPerformanceMonitor extends LitElement {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: {
-                    duration: 0
-                },
                 scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'second',
+                            displayFormats: {
+                                second: 'HH:mm:ss'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Value'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
                     }
                 }
             }
@@ -317,77 +221,141 @@ class AuroraPerformanceMonitor extends LitElement {
     _updateChart() {
         if (!this._chart) return;
 
-        this._chart.data.labels = this._historyData.timestamps.map(t => t.toLocaleTimeString());
-        this._chart.data.datasets[0].data = this._historyData.latency;
-        this._chart.data.datasets[1].data = this._historyData.cpuUsage;
-        this._chart.data.datasets[2].data = this._historyData.memoryUsage;
-        this._chart.data.datasets[3].data = this._historyData.audioBufferHealth;
-        this._chart.update('none');
+        this._chart.data.labels = this._history.timestamps;
+        this._chart.data.datasets[0].data = this._history.latency;
+        this._chart.data.datasets[1].data = this._history.cpuUsage;
+        this._chart.data.datasets[2].data = this._history.memoryUsage;
+        this._chart.update('none'); // Use 'none' mode for better performance
     }
 
     render() {
-        const tips = this._getOptimizationTips();
+        if (!this.hass) return html`<div>Loading...</div>`;
 
         return html`
-            <div class="metrics-grid">
-                <div class="metric-card" @click=${() => this._toggleExpanded()}>
-                    <div class="metric-label">Latency</div>
-                    <div class="metric-value">
-                        <span class="status-indicator ${this._getStatusClass(this._metrics.latency, { warning: 50, error: 100 })}"></span>
-                        ${this._metrics.latency.toFixed(1)}ms
-                    </div>
-                    <div class="tooltip">Click to view performance history</div>
+            <div class="monitor ${this._expanded ? 'expanded' : ''}">
+                <div class="header" @click=${this._toggleExpanded}>
+                    <h3>Performance Monitor</h3>
+                    <span class="toggle">${this._expanded ? '▼' : '▶'}</span>
                 </div>
-
-                <div class="metric-card">
-                    <div class="metric-label">CPU Usage</div>
-                    <div class="metric-value">
-                        <span class="status-indicator ${this._getStatusClass(this._metrics.cpuUsage, { warning: 70, error: 90 })}"></span>
-                        ${this._metrics.cpuUsage.toFixed(1)}%
+                <div class="metrics">
+                    <div class="metric ${this._getStatusClass(this._metrics.latency, { medium: 100, high: 200 })}">
+                        <span class="label">Latency</span>
+                        <span class="value">${this._metrics.latency}ms</span>
                     </div>
-                </div>
-
-                <div class="metric-card">
-                    <div class="metric-label">Memory Usage</div>
-                    <div class="metric-value">
-                        <span class="status-indicator ${this._getStatusClass(this._metrics.memoryUsage, { warning: 70, error: 90 })}"></span>
-                        ${this._metrics.memoryUsage.toFixed(1)}%
+                    <div class="metric ${this._getStatusClass(this._metrics.cpuUsage, { medium: 50, high: 80 })}">
+                        <span class="label">CPU Usage</span>
+                        <span class="value">${this._metrics.cpuUsage}%</span>
+                    </div>
+                    <div class="metric ${this._getStatusClass(this._metrics.memoryUsage, { medium: 60, high: 85 })}">
+                        <span class="label">Memory</span>
+                        <span class="value">${this._metrics.memoryUsage}%</span>
                     </div>
                 </div>
-
-                <div class="metric-card">
-                    <div class="metric-label">Buffer Health</div>
-                    <div class="metric-value">
-                        <span class="status-indicator ${this._getStatusClass(100 - this._metrics.audioBufferHealth, { warning: 30, error: 60 })}"></span>
-                        ${this._metrics.audioBufferHealth.toFixed(1)}%
+                ${this._expanded ? html`
+                    <div class="chart-container">
+                        <canvas id="performanceChart"></canvas>
                     </div>
-                </div>
+                ` : ''}
             </div>
+        `;
+    }
 
-            <div class="chart-container ${this._expanded ? 'expanded' : ''}">
-                <div class="chart-wrapper">
-                    <canvas id="performanceChart"></canvas>
-                </div>
-            </div>
+    static get styles() {
+        return css`
+            :host {
+                display: block;
+                margin: 16px;
+            }
 
-            ${tips.length > 0 ? html`
-                <div class="optimization-tips show">
-                    ${tips.map(tip => html`
-                        <div class="tip-item">
-                            <span class="tip-icon">${tip.icon}</span>
-                            <span>${tip.text}</span>
-                        </div>
-                    `)}
-                </div>
-            ` : ''}
+            .monitor {
+                background: var(--card-background-color, #fff);
+                border-radius: 8px;
+                box-shadow: var(--ha-card-box-shadow, 0 2px 2px rgba(0, 0, 0, 0.1));
+                padding: 16px;
+                transition: all 0.3s ease;
+            }
 
-            <div class="controls">
-                <button class="button" @click=${this._toggleExpanded}>
-                    ${this._expanded ? 'Hide' : 'Show'} Performance History
-                </button>
-            </div>
+            .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: pointer;
+                user-select: none;
+            }
+
+            .metrics {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 16px;
+                margin-top: 16px;
+                transition: all 0.3s ease;
+            }
+
+            .metric {
+                padding: 12px;
+                border-radius: 4px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                transition: all 0.3s ease;
+            }
+
+            .status-normal {
+                background-color: var(--success-color, #4CAF50);
+                color: white;
+            }
+
+            .status-medium {
+                background-color: var(--warning-color, #FF9800);
+                color: white;
+            }
+
+            .status-high {
+                background-color: var(--error-color, #F44336);
+                color: white;
+            }
+
+            .label {
+                font-size: 0.9em;
+                opacity: 0.9;
+            }
+
+            .value {
+                font-size: 1.2em;
+                font-weight: bold;
+                margin-top: 4px;
+            }
+
+            .chart-container {
+                margin-top: 16px;
+                height: 300px;
+                transition: all 0.3s ease;
+            }
+
+            .expanded {
+                height: auto;
+            }
+
+            .toggle {
+                font-size: 1.2em;
+                transition: transform 0.3s ease;
+            }
+
+            .expanded .toggle {
+                transform: rotate(180deg);
+            }
+
+            @media (max-width: 600px) {
+                .metrics {
+                    grid-template-columns: 1fr;
+                }
+
+                .chart-container {
+                    height: 200px;
+                }
+            }
         `;
     }
 }
 
-customElements.define("aurora-performance-monitor", AuroraPerformanceMonitor); 
+customElements.define('aurora-performance-monitor', AuroraPerformanceMonitor); 

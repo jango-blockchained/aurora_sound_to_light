@@ -8,12 +8,14 @@ class AuroraMediaControls extends LitElement {
     static get properties() {
         return {
             hass: { type: Object },
-            mediaPlayer: { type: String },
-            _playerState: { type: Object },
-            _volume: { type: Number },
-            _muted: { type: Boolean },
-            _position: { type: Number },
-            _positionTimer: { type: Number },
+            mediaPlayers: { type: Array },
+            selectedPlayer: { type: String },
+            volume: { type: Number },
+            inputSource: { type: String },
+            isPlaying: { type: Boolean },
+            currentTrack: { type: Object },
+            bufferSize: { type: Number },
+            microphoneGain: { type: Number }
         };
     }
 
@@ -21,317 +23,380 @@ class AuroraMediaControls extends LitElement {
         return css`
             :host {
                 display: block;
-                background: var(--card-background-color);
-                border-radius: var(--ha-card-border-radius);
+                padding: 16px;
+                background: var(--card-background-color, #fff);
+                border-radius: var(--ha-card-border-radius, 4px);
+                box-shadow: var(--ha-card-box-shadow, 0 2px 2px rgba(0, 0, 0, 0.1));
             }
-            .media-info {
+
+            .controls-container {
                 display: flex;
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            .header {
+                display: flex;
+                justify-content: space-between;
                 align-items: center;
                 margin-bottom: 16px;
-                padding: 8px;
-                background: var(--primary-background-color);
-                border-radius: var(--ha-card-border-radius);
             }
-            .media-art {
-                width: 60px;
-                height: 60px;
-                border-radius: 8px;
-                margin-right: 16px;
-                background-size: cover;
-                background-position: center;
-                box-shadow: var(--ha-card-box-shadow);
-            }
-            .media-details {
-                flex-grow: 1;
-                overflow: hidden;
-            }
-            .media-title {
-                font-size: 1.1em;
+
+            .title {
+                font-size: 1.2em;
                 font-weight: 500;
-                margin: 0;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
                 color: var(--primary-text-color);
             }
-            .media-artist {
-                font-size: 0.9em;
-                color: var(--secondary-text-color);
-                margin: 4px 0 0;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+
+            .player-selector {
+                width: 100%;
+                padding: 8px;
+                border-radius: 4px;
+                border: 1px solid var(--divider-color);
             }
-            .controls {
+
+            .control-row {
                 display: flex;
                 align-items: center;
+                gap: 16px;
+            }
+
+            .playback-controls {
+                display: flex;
                 justify-content: center;
                 gap: 16px;
-                margin: 16px 0;
             }
-            .volume-control {
+
+            button {
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                background: var(--primary-color);
+                color: white;
+                cursor: pointer;
+                transition: background 0.3s ease;
+            }
+
+            button:hover {
+                background: var(--primary-color-light);
+            }
+
+            button:disabled {
+                background: var(--disabled-color);
+                cursor: not-allowed;
+            }
+
+            .volume-slider {
+                flex: 1;
+                height: 36px;
+            }
+
+            .source-switch {
                 display: flex;
                 align-items: center;
                 gap: 8px;
-                margin: 16px 8px;
             }
-            ha-icon-button {
-                color: var(--primary-text-color);
-            }
-            .play-button {
-                background: var(--primary-color);
-                border-radius: 50%;
-                color: var(--text-primary-color);
-                transition: all 0.2s ease-in-out;
-            }
-            .play-button:hover {
-                background: var(--primary-color-light);
-            }
-            ha-slider {
-                flex-grow: 1;
-                --paper-slider-active-color: var(--primary-color);
-                --paper-slider-knob-color: var(--primary-color);
-            }
-            .progress {
-                margin: 8px;
+
+            .track-info {
                 padding: 8px;
-                background: var(--primary-background-color);
-                border-radius: var(--ha-card-border-radius);
+                background: var(--secondary-background-color);
+                border-radius: 4px;
+                margin-top: 16px;
             }
-            .progress-text {
-                display: flex;
-                justify-content: space-between;
-                font-size: 0.8em;
+
+            .track-info .title {
+                font-weight: bold;
+            }
+
+            .track-info .artist {
                 color: var(--secondary-text-color);
-                margin-top: 4px;
             }
-            .error-message {
-                color: var(--error-color);
-                font-size: 0.9em;
-                text-align: center;
-                padding: 8px;
+
+            .settings-row {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                margin-top: 16px;
             }
-            .unavailable {
-                opacity: 0.5;
-                pointer-events: none;
-            }
-            .no-player {
-                padding: 16px;
-                text-align: center;
+
+            .settings-label {
+                min-width: 120px;
                 color: var(--primary-text-color);
+            }
+
+            input[type="range"] {
+                flex: 1;
+                height: 4px;
+                border-radius: 2px;
+                background: var(--primary-color);
+            }
+
+            input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: var(--primary-color);
+                cursor: pointer;
             }
         `;
     }
 
     constructor() {
         super();
-        this._volume = 0;
-        this._muted = false;
-        this._playerState = null;
-        this._position = 0;
-        this._positionTimer = null;
+        this.mediaPlayers = [];
+        this.selectedPlayer = '';
+        this.volume = 1.0;
+        this.inputSource = 'media_player';
+        this.isPlaying = false;
+        this.currentTrack = {
+            title: '',
+            artist: '',
+            album: '',
+            duration: 0,
+            position: 0
+        };
+        this.bufferSize = 2048;
+        this.microphoneGain = 1.0;
     }
 
-    disconnectedCallback() {
-        super.disconnectedCallback();
-        this._clearPositionTimer();
+    firstUpdated() {
+        this._initializeMediaPlayers();
+        this._setupAudioContext();
     }
 
     render() {
-        if (!this.mediaPlayer) {
-            return html`
-                <div class="no-player">
-                    <ha-icon icon="mdi:music-off"></ha-icon>
-                    <div>No media player selected</div>
-                </div>
-            `;
-        }
-
-        if (!this._playerState) {
-            return html`
-                <div class="no-player">
-                    <ha-icon icon="mdi:alert-circle"></ha-icon>
-                    <div>Media player not available</div>
-                </div>
-            `;
-        }
-
-        const state = this._playerState;
-        const isPlaying = state.state === "playing";
-        const isUnavailable = state.state === "unavailable";
-        const hasMediaArt = state.attributes?.entity_picture;
-        const supportsPrevious = state.attributes?.supported_features & 16;
-        const supportsNext = state.attributes?.supported_features & 32;
-
         return html`
-            <div class="${isUnavailable ? 'unavailable' : ''}">
-                <div class="media-info">
-                    ${hasMediaArt
-                        ? html`<div
-                            class="media-art"
-                            style="background-image: url(${state.attributes.entity_picture})"
-                        ></div>`
-                        : ""}
-                    <div class="media-details">
-                        <h3 class="media-title">
-                            ${state.attributes?.media_title || "Nothing playing"}
-                        </h3>
-                        <p class="media-artist">${state.attributes?.media_artist || ""}</p>
+            <div class="controls-container">
+                <div class="header">
+                    <div class="title">Media Controls</div>
+                </div>
+
+                <select class="player-selector" 
+                        .value=${this.selectedPlayer}
+                        @change=${this._handlePlayerChange}>
+                    <option value="">Select Media Player</option>
+                    ${this.mediaPlayers.map(player => html`
+                        <option value=${player.entity_id}>${player.name}</option>
+                    `)}
+                </select>
+
+                <div class="source-switch">
+                    <label>
+                        <input type="radio" 
+                               name="source" 
+                               value="media_player"
+                               .checked=${this.inputSource === 'media_player'}
+                               @change=${this._handleSourceChange}>
+                        Media Player
+                    </label>
+                    <label>
+                        <input type="radio" 
+                               name="source" 
+                               value="microphone"
+                               .checked=${this.inputSource === 'microphone'}
+                               @change=${this._handleSourceChange}>
+                        Microphone
+                    </label>
+                </div>
+
+                <div class="playback-controls">
+                    <button @click=${this._handlePrevious} 
+                            ?disabled=${!this.selectedPlayer || this.inputSource !== 'media_player'}>
+                        ⏮️
+                    </button>
+                    <button @click=${this._handlePlayPause}
+                            ?disabled=${!this.selectedPlayer && this.inputSource === 'media_player'}>
+                        ${this.isPlaying ? '⏸️' : '▶️'}
+                    </button>
+                    <button @click=${this._handleNext}
+                            ?disabled=${!this.selectedPlayer || this.inputSource !== 'media_player'}>
+                        ⏭️
+                    </button>
+                </div>
+
+                <div class="control-row">
+                    <span>Volume</span>
+                    <input type="range" 
+                           class="volume-slider"
+                           min="0" 
+                           max="1" 
+                           step="0.01"
+                           .value=${this.volume}
+                           @input=${this._handleVolumeChange}>
+                </div>
+
+                ${this.inputSource === 'microphone' ? html`
+                    <div class="settings-row">
+                        <span class="settings-label">Microphone Gain</span>
+                        <input type="range" 
+                               min="0" 
+                               max="2" 
+                               step="0.1"
+                               .value=${this.microphoneGain}
+                               @input=${this._handleGainChange}>
                     </div>
-                </div>
 
-                <div class="controls">
-                    ${supportsPrevious
-                        ? html`
-                            <ha-icon-button @click=${this._previousTrack}>
-                                <ha-icon icon="mdi:skip-previous"></ha-icon>
-                            </ha-icon-button>
-                        `
-                        : ""}
-                    <ha-icon-button 
-                        class="play-button" 
-                        @click=${this._playPause}
-                    >
-                        <ha-icon icon="${isPlaying ? 'mdi:pause' : 'mdi:play'}"></ha-icon>
-                    </ha-icon-button>
-                    ${supportsNext
-                        ? html`
-                            <ha-icon-button @click=${this._nextTrack}>
-                                <ha-icon icon="mdi:skip-next"></ha-icon>
-                            </ha-icon-button>
-                        `
-                        : ""}
-                </div>
+                    <div class="settings-row">
+                        <span class="settings-label">Buffer Size</span>
+                        <select @change=${this._handleBufferSizeChange}>
+                            ${[512, 1024, 2048, 4096, 8192].map(size => html`
+                                <option value=${size} ?selected=${this.bufferSize === size}>
+                                    ${size}
+                                </option>
+                            `)}
+                        </select>
+                    </div>
+                ` : ''}
 
-                <div class="volume-control">
-                    <ha-icon-button @click=${this._toggleMute}>
-                        <ha-icon 
-                            icon="${this._muted ? 'mdi:volume-off' : 'mdi:volume-high'}"
-                        ></ha-icon>
-                    </ha-icon-button>
-                    <ha-slider
-                        min="0"
-                        max="100"
-                        step="1"
-                        .value=${this._volume}
-                        @change=${this._volumeChanged}
-                    ></ha-slider>
-                </div>
-
-                ${state.attributes?.media_duration
-                    ? html`
-                        <div class="progress">
-                            <ha-slider
-                                min="0"
-                                max=${state.attributes.media_duration}
-                                step="1"
-                                .value=${this._position}
-                                @change=${this._seekChanged}
-                            ></ha-slider>
-                            <div class="progress-text">
-                                <span>${this._formatTime(this._position)}</span>
-                                <span>${this._formatTime(state.attributes.media_duration)}</span>
-                            </div>
-                        </div>
-                    `
-                    : ""}
+                ${this.currentTrack.title && this.inputSource === 'media_player' ? html`
+                    <div class="track-info">
+                        <div class="title">${this.currentTrack.title}</div>
+                        ${this.currentTrack.artist ? html`
+                            <div class="artist">${this.currentTrack.artist}</div>
+                        ` : ''}
+                    </div>
+                ` : ''}
             </div>
         `;
     }
 
-    updated(changedProps) {
-        if (changedProps.has("hass") || changedProps.has("mediaPlayer")) {
-            this._updatePlayerState();
+    _initializeMediaPlayers() {
+        if (this.hass) {
+            this.mediaPlayers = Object.entries(this.hass.states)
+                .filter(([entity_id]) => entity_id.startsWith('media_player.'))
+                .map(([entity_id, state]) => ({
+                    entity_id,
+                    name: state.attributes.friendly_name || entity_id.split('.')[1]
+                }));
         }
+    }
 
-        if (changedProps.has("_playerState")) {
-            this._handleStateChange();
+    async _setupAudioContext() {
+        try {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this.gainNode = this.audioContext.createGain();
+            this.gainNode.connect(this.audioContext.destination);
+
+            if (this.inputSource === 'microphone') {
+                await this._setupMicrophone();
+            }
+        } catch (error) {
+            this._dispatchEvent('error', { message: 'Failed to initialize audio context' });
+        }
+    }
+
+    async _setupMicrophone() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const source = this.audioContext.createMediaStreamSource(stream);
+            source.connect(this.gainNode);
+        } catch (error) {
+            this._dispatchEvent('error', { message: 'Failed to access microphone' });
+        }
+    }
+
+    _handlePlayerChange(e) {
+        this.selectedPlayer = e.target.value;
+        this._dispatchEvent('player-change', { player: this.selectedPlayer });
+    }
+
+    _handleSourceChange(e) {
+        this.inputSource = e.target.value;
+        this._dispatchEvent('source-change', { source: this.inputSource });
+
+        if (this.inputSource === 'microphone') {
+            this._setupMicrophone();
+        }
+    }
+
+    _handlePlayPause() {
+        this.isPlaying = !this.isPlaying;
+
+        if (this.inputSource === 'media_player' && this.selectedPlayer) {
+            this._dispatchEvent('media-command', {
+                command: this.isPlaying ? 'play' : 'pause',
+                player: this.selectedPlayer
+            });
+        } else if (this.inputSource === 'microphone') {
+            if (this.isPlaying) {
+                this.audioContext.resume();
+            } else {
+                this.audioContext.suspend();
+            }
+        }
+    }
+
+    _handlePrevious() {
+        if (this.selectedPlayer) {
+            this._dispatchEvent('media-command', {
+                command: 'previous',
+                player: this.selectedPlayer
+            });
+        }
+    }
+
+    _handleNext() {
+        if (this.selectedPlayer) {
+            this._dispatchEvent('media-command', {
+                command: 'next',
+                player: this.selectedPlayer
+            });
+        }
+    }
+
+    _handleVolumeChange(e) {
+        this.volume = parseFloat(e.target.value);
+        this.gainNode.gain.value = this.volume;
+        this._dispatchEvent('volume-change', { volume: this.volume });
+    }
+
+    _handleGainChange(e) {
+        this.microphoneGain = parseFloat(e.target.value);
+        if (this.gainNode) {
+            this.gainNode.gain.value = this.microphoneGain;
+        }
+        this._dispatchEvent('gain-change', { gain: this.microphoneGain });
+    }
+
+    _handleBufferSizeChange(e) {
+        this.bufferSize = parseInt(e.target.value);
+        this._dispatchEvent('buffer-size-change', { bufferSize: this.bufferSize });
+    }
+
+    _dispatchEvent(type, detail) {
+        const event = new CustomEvent(`aurora-media-${type}`, {
+            detail,
+            bubbles: true,
+            composed: true
+        });
+        this.dispatchEvent(event);
+    }
+
+    // Update state from Home Assistant
+    updated(changedProperties) {
+        if (changedProperties.has('hass')) {
+            this._initializeMediaPlayers();
+            this._updatePlayerState();
         }
     }
 
     _updatePlayerState() {
-        if (!this.hass || !this.mediaPlayer) return;
-
-        const state = this.hass.states[this.mediaPlayer];
-        if (state) {
-            this._playerState = state;
-            this._volume = state.attributes?.volume_level * 100 || 0;
-            this._muted = state.attributes?.is_volume_muted || false;
-            this._position = state.attributes?.media_position || 0;
-        } else {
-            this._playerState = null;
+        if (this.hass && this.selectedPlayer) {
+            const state = this.hass.states[this.selectedPlayer];
+            if (state) {
+                this.isPlaying = state.state === 'playing';
+                this.volume = state.attributes.volume_level || 1;
+                this.currentTrack = {
+                    title: state.attributes.media_title || '',
+                    artist: state.attributes.media_artist || '',
+                    album: state.attributes.media_album_name || '',
+                    duration: state.attributes.media_duration || 0,
+                    position: state.attributes.media_position || 0
+                };
+            }
         }
-    }
-
-    _handleStateChange() {
-        this._clearPositionTimer();
-
-        if (this._playerState?.state === "playing") {
-            this._positionTimer = setInterval(() => {
-                this._position++;
-            }, 1000);
-        }
-    }
-
-    _clearPositionTimer() {
-        if (this._positionTimer) {
-            clearInterval(this._positionTimer);
-            this._positionTimer = null;
-        }
-    }
-
-    _formatTime(seconds) {
-        if (!seconds) return "0:00";
-        const minutes = Math.floor(seconds / 60);
-        seconds = Math.floor(seconds % 60);
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-
-    async _playPause() {
-        if (!this.hass || !this.mediaPlayer) return;
-        await this.hass.callService("media_player", "media_play_pause", {
-            entity_id: this.mediaPlayer
-        });
-    }
-
-    async _previousTrack() {
-        if (!this.hass || !this.mediaPlayer) return;
-        await this.hass.callService("media_player", "media_previous_track", {
-            entity_id: this.mediaPlayer
-        });
-    }
-
-    async _nextTrack() {
-        if (!this.hass || !this.mediaPlayer) return;
-        await this.hass.callService("media_player", "media_next_track", {
-            entity_id: this.mediaPlayer
-        });
-    }
-
-    async _toggleMute() {
-        if (!this.hass || !this.mediaPlayer) return;
-        await this.hass.callService("media_player", "volume_mute", {
-            entity_id: this.mediaPlayer,
-            is_volume_muted: !this._muted
-        });
-    }
-
-    async _volumeChanged(e) {
-        if (!this.hass || !this.mediaPlayer) return;
-        const volume = e.target.value / 100;
-        await this.hass.callService("media_player", "volume_set", {
-            entity_id: this.mediaPlayer,
-            volume_level: volume
-        });
-    }
-
-    async _seekChanged(e) {
-        if (!this.hass || !this.mediaPlayer) return;
-        await this.hass.callService("media_player", "media_seek", {
-            entity_id: this.mediaPlayer,
-            seek_position: e.target.value
-        });
     }
 }
 
-customElements.define("aurora-media-controls", AuroraMediaControls); 
+customElements.define('aurora-media-controls', AuroraMediaControls); 
