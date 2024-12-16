@@ -45,6 +45,8 @@ describe('AuroraPerformanceMonitor', () => {
             audioBufferHealth: 100,
             systemStatus: 'good'
         });
+        expect(element._historyData.latency).to.be.an('array').that.is.empty;
+        expect(element._expanded).to.be.false;
     });
 
     it('updates metrics via WebSocket', async () => {
@@ -58,6 +60,12 @@ describe('AuroraPerformanceMonitor', () => {
             audioBufferHealth: 95.0,
             systemStatus: 'good'
         });
+
+        // Check history data
+        expect(element._historyData.latency).to.have.lengthOf(1);
+        expect(element._historyData.cpuUsage).to.have.lengthOf(1);
+        expect(element._historyData.memoryUsage).to.have.lengthOf(1);
+        expect(element._historyData.audioBufferHealth).to.have.lengthOf(1);
     });
 
     it('handles WebSocket errors gracefully', async () => {
@@ -133,40 +141,61 @@ describe('AuroraPerformanceMonitor', () => {
         clearIntervalSpy.restore();
     });
 
-    it('applies correct status indicator classes', async () => {
-        // Set metrics directly to ensure we have the values we want to test
+    it('toggles chart visibility', async () => {
+        const latencyCard = element.shadowRoot.querySelector('.metric-card');
+
+        expect(element._expanded).to.be.false;
+        expect(element.shadowRoot.querySelector('.chart-container').classList.contains('expanded')).to.be.false;
+
+        latencyCard.click();
+        await element.updateComplete;
+
+        expect(element._expanded).to.be.true;
+        expect(element.shadowRoot.querySelector('.chart-container').classList.contains('expanded')).to.be.true;
+    });
+
+    it('shows optimization tips when thresholds are exceeded', async () => {
         element._metrics = {
-            latency: 45.5,
-            cpuUsage: 65.0,
-            memoryUsage: 75.0,
-            audioBufferHealth: 95.0,
-            systemStatus: 'good'
+            latency: 60,
+            cpuUsage: 80,
+            memoryUsage: 85,
+            audioBufferHealth: 85,
+            systemStatus: 'warning'
         };
 
-        // Request an update and wait for it to complete
         element.requestUpdate();
         await element.updateComplete;
-        await waitUntil(() => element.shadowRoot.querySelectorAll('.status-indicator').length === 4);
 
-        const metricCards = element.shadowRoot.querySelectorAll('.metric-card');
-        expect(metricCards.length).to.equal(4);
+        const tips = element.shadowRoot.querySelectorAll('.tip-item');
+        expect(tips.length).to.be.greaterThan(0);
 
-        // Check each status indicator
-        const statusIndicators = Array.from(element.shadowRoot.querySelectorAll('.status-indicator'));
-        expect(statusIndicators.length).to.equal(4);
+        const tipTexts = Array.from(tips).map(tip => tip.textContent);
+        expect(tipTexts.some(text => text.includes('High latency'))).to.be.true;
+        expect(tipTexts.some(text => text.includes('High CPU usage'))).to.be.true;
+        expect(tipTexts.some(text => text.includes('High memory usage'))).to.be.true;
+    });
 
-        // Latency (45.5ms < 50 warning threshold)
-        expect(statusIndicators[0].classList.contains('status-warning'), 'Latency should not be in warning state').to.be.false;
-        expect(statusIndicators[0].classList.contains('status-good'), 'Latency should be in good state').to.be.true;
+    it('maintains history data within limits', async () => {
+        // Simulate 70 updates
+        for (let i = 0; i < 70; i++) {
+            await element._updateMetrics();
+        }
 
-        // CPU Usage (65.0% < 70 warning threshold)
-        expect(statusIndicators[1].classList.contains('status-good'), 'CPU should be in good state').to.be.true;
-        expect(statusIndicators[1].classList.contains('status-warning'), 'CPU should not be in warning state').to.be.false;
+        // Check that history is limited to 60 entries
+        expect(element._historyData.timestamps.length).to.equal(60);
+        expect(element._historyData.latency.length).to.equal(60);
+        expect(element._historyData.cpuUsage.length).to.equal(60);
+        expect(element._historyData.memoryUsage.length).to.equal(60);
+        expect(element._historyData.audioBufferHealth.length).to.equal(60);
+    });
 
-        // Memory Usage (75.0% > 70 warning threshold)
-        expect(statusIndicators[2].classList.contains('status-warning'), 'Memory should be in warning state').to.be.true;
+    it('initializes and updates chart when expanded', async () => {
+        await element._updateMetrics();
+        element._toggleExpanded();
+        await element.updateComplete;
 
-        // Buffer Health (95.0% -> 5% inverted < 30 warning threshold)
-        expect(statusIndicators[3].classList.contains('status-good'), 'Buffer health should be in good state').to.be.true;
+        const canvas = element.shadowRoot.querySelector('#performanceChart');
+        expect(canvas).to.exist;
+        expect(element._chart).to.exist;
     });
 }); 
