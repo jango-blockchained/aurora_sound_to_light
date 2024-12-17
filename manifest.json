@@ -21,7 +21,7 @@
     "version": "1.0.0",
     "config_flow": true,
     "integration_type": "hub",
-    "frontend_js_module": "/custom_components/aurora_sound_to_light/frontend/index.js",
+    "frontend_js_module": "custom_components/aurora_sound_to_light/frontend/index.js",
     "system_requirements": [
         "python3-pyaudio",
         "portaudio19-dev",

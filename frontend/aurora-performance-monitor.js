@@ -1,8 +1,28 @@
 import { LitElement, html, css } from 'lit';
-import { Chart, registerables } from 'chart.js';
-import 'chartjs-adapter-date-fns';
 
-Chart.register(...registerables);
+// Initialize Chart.js when the component loads
+let chartInitialized = false;
+
+function initializeChart() {
+    if (chartInitialized || !window.Chart) return;
+
+    const { Chart } = window;
+    // Register all required components
+    Chart.register(
+        Chart.LineController,
+        Chart.LineElement,
+        Chart.PointElement,
+        Chart.LinearScale,
+        Chart.TimeScale,
+        Chart.CategoryScale,
+        Chart.Legend,
+        Chart.Title,
+        Chart.Tooltip,
+        Chart.Filler
+    );
+
+    chartInitialized = true;
+}
 
 export class AuroraPerformanceMonitor extends LitElement {
     static get properties() {
@@ -11,12 +31,16 @@ export class AuroraPerformanceMonitor extends LitElement {
             _metrics: { type: Object, state: true },
             _expanded: { type: Boolean, state: true },
             _showChart: { type: Boolean, state: true },
-            _updateInterval: { type: Number, state: true }
+            _updateInterval: { type: Number, state: true },
+            alerts: { type: Array, state: true }
         };
     }
 
     constructor() {
         super();
+        // Initialize Chart.js components
+        initializeChart();
+
         this._metrics = {
             latency: 0,
             cpuUsage: 0,
@@ -34,6 +58,7 @@ export class AuroraPerformanceMonitor extends LitElement {
         };
         this._maxHistoryLength = 50;
         this._chart = null;
+        this.alerts = [];
     }
 
     updated(changedProperties) {
@@ -80,16 +105,31 @@ export class AuroraPerformanceMonitor extends LitElement {
         if (!this.hass) return;
 
         try {
-            const metrics = await this.hass.callWS({
-                type: 'get_metrics'
+            const response = await this.hass.callWS({
+                type: 'aurora_sound_to_light/get_performance_metrics'
             });
 
+            // Extract metrics from the response
+            const metrics = response.metrics || response;
+
             this._metrics = {
-                latency: metrics.latency,
-                cpuUsage: metrics.cpuUsage,
-                memoryUsage: metrics.memoryUsage,
-                timestamp: metrics.timestamp
+                latency: metrics.latency || 0,
+                cpuUsage: metrics.cpuUsage || 0,
+                memoryUsage: metrics.memoryUsage || 0,
+                timestamp: metrics.timestamp || Date.now()
             };
+
+            // Update alerts based on thresholds
+            this.alerts = [];
+            if (this._metrics.cpuUsage > 80) {
+                this.alerts.push('High CPU Usage');
+            }
+            if (this._metrics.memoryUsage > 85) {
+                this.alerts.push('High Memory Usage');
+            }
+            if (this._metrics.latency > 200) {
+                this.alerts.push('High Latency');
+            }
 
             this._updateHistory(this._metrics);
 
@@ -100,6 +140,17 @@ export class AuroraPerformanceMonitor extends LitElement {
             this.requestUpdate();
         } catch (error) {
             console.error('Failed to update metrics:', error);
+            // On error, use the mock metrics if they're available
+            if (this.hass.metrics) {
+                this._metrics = {
+                    latency: this.hass.metrics.latency || 0,
+                    cpuUsage: this.hass.metrics.cpuUsage || 0,
+                    memoryUsage: this.hass.metrics.memoryUsage || 0,
+                    timestamp: this.hass.metrics.timestamp || Date.now()
+                };
+                this._updateHistory(this._metrics);
+                this.requestUpdate();
+            }
             this.dispatchEvent(new CustomEvent('error', {
                 detail: { message: error.message }
             }));
@@ -147,75 +198,123 @@ export class AuroraPerformanceMonitor extends LitElement {
     }
 
     async _initChart() {
+        // Make sure Chart.js is initialized
+        initializeChart();
+        if (!window.Chart) {
+            console.error('Chart.js is not available');
+            return;
+        }
+
         const canvas = this.shadowRoot.querySelector('#performanceChart');
-        if (!canvas) return;
+        if (!canvas) {
+            console.error('Canvas element not found');
+            return;
+        }
 
         const ctx = canvas.getContext('2d');
         if (this._chart) {
             this._chart.destroy();
         }
 
-        this._chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: this._history.timestamps,
-                datasets: [
-                    {
-                        label: 'Latency (ms)',
-                        data: this._history.latency,
-                        borderColor: 'rgb(75, 192, 192)',
-                        tension: 0.1
+        try {
+            this._chart = new window.Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: this._history.timestamps,
+                    datasets: [
+                        {
+                            label: 'Latency (ms)',
+                            data: this._history.latency,
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                            tension: 0.1,
+                            fill: true
+                        },
+                        {
+                            label: 'CPU Usage (%)',
+                            data: this._history.cpuUsage,
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            tension: 0.1,
+                            fill: true
+                        },
+                        {
+                            label: 'Memory Usage (%)',
+                            data: this._history.memoryUsage,
+                            borderColor: 'rgb(153, 102, 255)',
+                            backgroundColor: 'rgba(153, 102, 255, 0.1)',
+                            tension: 0.1,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 750,
+                        easing: 'easeInOutQuart'
                     },
-                    {
-                        label: 'CPU Usage (%)',
-                        data: this._history.cpuUsage,
-                        borderColor: 'rgb(255, 99, 132)',
-                        tension: 0.1
-                    },
-                    {
-                        label: 'Memory Usage (%)',
-                        data: this._history.memoryUsage,
-                        borderColor: 'rgb(153, 102, 255)',
-                        tension: 0.1
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: {
-                            unit: 'second',
-                            displayFormats: {
-                                second: 'HH:mm:ss'
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'second',
+                                displayFormats: {
+                                    second: 'HH:mm:ss'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0,0,0,0.1)'
                             }
                         },
-                        title: {
-                            display: true,
-                            text: 'Time'
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Value'
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0,0,0,0.1)'
+                            }
                         }
                     },
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Value'
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            padding: 10,
+                            cornerRadius: 4,
+                            titleColor: 'white',
+                            bodyColor: 'white',
+                            borderColor: 'white',
+                            borderWidth: 1
                         }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        position: 'top'
                     },
-                    tooltip: {
-                        mode: 'index',
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
                         intersect: false
                     }
                 }
-            }
-        });
+            });
+        } catch (error) {
+            console.error('Failed to initialize chart:', error);
+        }
     }
 
     _updateChart() {

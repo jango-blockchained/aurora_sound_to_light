@@ -1,218 +1,391 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aurora Performance Monitor Tests</title>
     <style>
+        :root {
+            --background: #0a0b0d;
+            --foreground: #ffffff;
+            --primary: #3b82f6;
+            --secondary: #64748b;
+            --accent: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --blur-strength: 10px;
+            --container-opacity: 0.8;
+            --gradient-start: rgba(139, 92, 246, 0.15);
+            --gradient-end: rgba(59, 130, 246, 0.15);
+        }
+
+        @keyframes colorShift {
+            0% {
+                filter: hue-rotate(0deg) blur(120px);
+                transform: scale(1);
+                opacity: 0.5;
+            }
+
+            50% {
+                filter: hue-rotate(180deg) blur(150px);
+                transform: scale(1.2);
+                opacity: 0.7;
+            }
+
+            100% {
+                filter: hue-rotate(360deg) blur(120px);
+                transform: scale(1);
+                opacity: 0.5;
+            }
+        }
+
+        @keyframes float {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            33% {
+                transform: translate(3%, 5%);
+            }
+
+            66% {
+                transform: translate(-3%, 8%);
+            }
+
+            100% {
+                transform: translate(0, 0);
+            }
+        }
+
         body {
             margin: 0;
-            padding: 20px;
+            padding: 40px 20px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: #f0f0f0;
+            background-color: var(--background);
+            color: var(--foreground);
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='grain' x='-50%25' y='-50%25' width='200%25' height='200%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch' result='noise'/%3E%3CfeColorMatrix type='saturate' values='0' result='desaturatedNoise'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.03'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)' opacity='0.12'/%3E%3C/svg%3E");
+            background-repeat: repeat;
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            width: 80vw;
+            height: 80vw;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+            top: -30vw;
+            left: -20vw;
+            background: linear-gradient(45deg, var(--gradient-start), var(--gradient-end));
+            animation: colorShift 30s infinite alternate, float 40s infinite ease-in-out;
         }
 
         .test-container {
             max-width: 1200px;
             margin: 0 auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background: rgba(17, 17, 17, 0.7);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
         }
 
-        .test-controls {
-            margin-bottom: 20px;
+        .scenario-card {
             padding: 20px;
-            background: #f8f9fa;
-            border-radius: 4px;
+            background: rgba(26, 26, 26, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            backdrop-filter: blur(var(--blur-strength));
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 16px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .scenario-card.passed {
+            border-left-color: var(--success);
+        }
+
+        .scenario-card.failed {
+            border-left-color: var(--error);
+        }
+
+        .scenario-card.warning {
+            border-left-color: var(--warning);
+        }
+
+        .scenario-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+
+        .scenario-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--primary);
+            transition: width 0.3s ease;
+        }
+
+        .scenario-progress-bar.running {
+            animation: progress-pulse 2s infinite;
+        }
+
+        @keyframes progress-pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .metric-item {
             display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+            font-size: 14px;
+            color: var(--secondary);
         }
 
-        .test-controls button {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            background: #007bff;
-            color: white;
-            cursor: pointer;
-            transition: background-color 0.2s;
+        .metric-value {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            color: #3b82f6;
+            transition: color 0.3s ease;
+            font-weight: 500;
         }
 
-        .test-controls button:hover {
-            background: #0056b3;
+        .metric-value.warning {
+            color: var(--warning);
         }
 
-        .test-controls button.warning {
-            background: #ffc107;
-        }
-
-        .test-controls button.danger {
-            background: #dc3545;
+        .metric-value.error {
+            color: var(--error);
         }
 
         .test-summary {
-            margin: 20px 0;
-            padding: 20px;
-            background: #e9ecef;
-            border-radius: 4px;
+            margin: 30px 0;
+            padding: 30px;
+            background: rgba(26, 26, 26, 0.5);
+            border-radius: 16px;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            position: relative;
+            z-index: 1;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
         }
 
         .summary-item {
             text-align: center;
-            padding: 10px;
-            background: white;
-            border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            background: rgba(34, 34, 34, 0.7);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .summary-item:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
         }
 
         .summary-item .value {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 8px 0;
+            font-size: 36px;
+            font-weight: 700;
+            margin: 10px 0;
+            color: var(--primary);
+            text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
         }
 
         .summary-item .label {
-            color: #6c757d;
-            font-size: 14px;
+            color: var(--secondary);
+            font-size: 0.95rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        h1 {
+            color: var(--foreground);
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            position: relative;
+            z-index: 1;
+            font-weight: 600;
+        }
+
+        .test-controls {
+            margin-bottom: 30px;
+            padding: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .test-controls button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            background: var(--primary);
+            color: var(--foreground);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            font-size: 0.95rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .test-controls button:first-child {
+            background: var(--primary);
+        }
+
+        .test-controls button.warning {
+            background: var(--warning);
+        }
+
+        .test-controls button.danger {
+            background: var(--error);
         }
 
         .test-results {
             margin: 20px 0;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 16px;
-        }
-
-        .scenario-card {
-            padding: 16px;
-            background: white;
-            border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
-        .scenario-card.passed {
-            border-left: 4px solid #28a745;
-        }
-
-        .scenario-card.failed {
-            border-left: 4px solid #dc3545;
-        }
-
-        .scenario-card.warning {
-            border-left: 4px solid #ffc107;
+            gap: 20px;
         }
 
         .scenario-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 15px;
         }
 
         .scenario-name {
             font-weight: bold;
-            font-size: 16px;
+            font-size: 18px;
+            color: var(--foreground);
         }
 
         .scenario-status {
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 5px 10px;
+            border-radius: 20px;
             font-size: 12px;
             font-weight: bold;
+            text-transform: uppercase;
         }
 
         .status-passed {
-            background: #d4edda;
-            color: #155724;
+            background: rgba(0, 112, 243, 0.2);
+            color: var(--success);
         }
 
         .status-failed {
-            background: #f8d7da;
-            color: #721c24;
+            background: rgba(255, 0, 0, 0.2);
+            color: var(--error);
         }
 
         .status-warning {
-            background: #fff3cd;
-            color: #856404;
+            background: rgba(245, 166, 35, 0.2);
+            color: var(--warning);
         }
 
         .metric-list {
-            margin: 12px 0;
+            margin: 15px 0;
             font-size: 14px;
-        }
-
-        .metric-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            border-bottom: 1px solid #eee;
         }
 
         .warning-list,
         .error-list {
-            margin: 8px 0;
+            margin: 10px 0;
             font-size: 14px;
         }
 
         .warning-item,
         .error-item {
-            padding: 4px 8px;
-            margin: 4px 0;
-            border-radius: 2px;
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 4px;
         }
 
         .warning-item {
-            background: #fff3cd;
-            color: #856404;
+            background: rgba(245, 166, 35, 0.2);
+            color: var(--warning);
         }
 
         .error-item {
-            background: #f8d7da;
-            color: #721c24;
+            background: rgba(255, 0, 0, 0.2);
+            color: var(--error);
         }
 
         .test-log {
             margin-top: 20px;
-            padding: 16px;
-            background: #f8f9fa;
-            border-radius: 4px;
-            font-family: monospace;
+            padding: 20px;
+            background: rgba(26, 26, 26, var(--container-opacity));
+            border-radius: 8px;
+            font-family: 'Fira Code', monospace;
             max-height: 300px;
             overflow-y: auto;
+            backdrop-filter: blur(var(--blur-strength));
         }
 
         .test-log .entry {
-            margin: 4px 0;
-            padding: 4px 8px;
-            border-left: 3px solid #007bff;
-            font-size: 12px;
+            margin: 5px 0;
+            padding: 5px 10px;
+            border-left: 3px solid var(--primary);
+            font-size: 13px;
         }
 
         .test-log .error {
-            border-left-color: #dc3545;
-            color: #dc3545;
+            border-left-color: var(--error);
+            color: var(--error);
         }
 
         .test-log .success {
-            border-left-color: #28a745;
-            color: #28a745;
+            border-left-color: var(--success);
+            color: var(--success);
         }
 
         .test-log .warning {
-            border-left-color: #ffc107;
-            color: #856404;
+            border-left-color: var(--warning);
+            color: var(--warning);
         }
 
         #monitor-container {
             margin: 20px 0;
             padding: 20px;
-            background: #f8f9fa;
-            border-radius: 4px;
+            background: rgba(26, 26, 26, var(--container-opacity));
+            border-radius: 8px;
+            backdrop-filter: blur(var(--blur-strength));
         }
 
         .download-report {
@@ -221,22 +394,45 @@
         }
 
         .download-report button {
-            padding: 8px 16px;
-            background: #28a745;
-            color: white;
+            padding: 12px 24px;
+            background: #10b981;
+            color: var(--foreground);
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            transition: all 0.3s ease;
         }
 
         .download-report button:hover {
-            background: #218838;
+            background: #0d9668;
+            transform: translateY(-1px);
+        }
+
+        .download-report svg {
+            width: 16px;
+            height: 16px;
+            margin-left: 4px;
         }
 
         @media (max-width: 768px) {
+            body {
+                padding: 20px 16px;
+            }
+
+            .test-container {
+                padding: 24px;
+                border-radius: 16px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
             .test-controls {
                 flex-direction: column;
             }
@@ -246,7 +442,12 @@
             }
 
             .test-summary {
+                padding: 20px;
                 grid-template-columns: 1fr;
+            }
+
+            .summary-item {
+                padding: 20px;
             }
         }
     </style>
@@ -257,11 +458,13 @@
         <h1>Aurora Performance Monitor Tests</h1>
 
         <div class="test-controls">
-            <button onclick="window.testPerformanceMonitor.runTests()">Run All Tests</button>
-            <button onclick="runScenario('Normal Operation')">Test Normal Operation</button>
-            <button onclick="runScenario('High CPU Load')" class="warning">Test High CPU Load</button>
-            <button onclick="runScenario('Network Issues')" class="warning">Test Network Issues</button>
-            <button onclick="runScenario('Critical System Load')" class="danger">Test Critical Load</button>
+            <button onclick="window.testRunner.runTests()">Run All Tests</button>
+            <button onclick="window.testRunner.runScenario('Normal Operation')">Test Normal Operation</button>
+            <button onclick="window.testRunner.runScenario('High CPU Load')" class="warning">Test High CPU Load</button>
+            <button onclick="window.testRunner.runScenario('Network Issues')" class="warning">Test Network
+                Issues</button>
+            <button onclick="window.testRunner.runScenario('Critical System Load')" class="danger">Test Critical
+                Load</button>
         </div>
 
         <div class="test-summary" id="testSummary">
@@ -290,7 +493,7 @@
         <div class="test-log" id="testLog"></div>
 
         <div class="download-report">
-            <button onclick="downloadLatestReport()">
+            <button onclick="window.testRunner.downloadLatestReport()">
                 <span>Download Test Report</span>
                 <svg width="16" height="16" viewBox="0 0 16 16">
                     <path fill="currentColor" d="M8 12l-4-4h2.5V3h3v5H12L8 12zm-6 2h12v-2H2v2z" />
@@ -299,104 +502,687 @@
         </div>
     </div>
 
+    <!-- Load Chart.js and its dependencies first -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.1/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "lit": "https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js",
+            "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@1/reactive-element.js",
+            "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@3/lit-element.js",
+            "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@2/lit-html.js"
+        }
+    }
+    </script>
+
     <script type="module">
-        import './aurora-performance-monitor.js';
-        import './test-performance-monitor.js';
-
-        window.runScenario = async (scenarioName) => {
-            const scenario = window.testPerformanceMonitor.testScenarios.find(s => s.name === scenarioName);
-            if (!scenario) {
-                logMessage(`Scenario not found: ${scenarioName}`, 'error');
-                return;
+        class TestScenario {
+            constructor(name, duration = 30) {
+                this.name = name;
+                this.duration = duration;
+                this.progress = 0;
+                this.metrics = {
+                    cpuUsage: 0,
+                    memoryUsage: 0,
+                    networkLoad: 0,
+                    responseTime: 0
+                };
+                this.previousMetrics = { ...this.metrics };
+                this.status = 'pending';
+                this.element = null;
+                this.state = {};
+                this._eventListeners = new Map();
+                this._animationFrameId = null;
+                this.metricsHistory = {
+                    timestamps: [],
+                    cpuUsage: [],
+                    memoryUsage: [],
+                    networkLoad: [],
+                    responseTime: []
+                };
+                this.lastUpdateTime = 0;
             }
 
-            const mockHass = new window.testPerformanceMonitor.MockHomeAssistant();
-            const container = document.getElementById('monitor-container');
-            container.innerHTML = '';
+            log(message, type = 'info') {
+                const logContainer = document.getElementById('testLog');
+                const entry = document.createElement('div');
+                entry.className = `entry ${type}`;
+                entry.textContent = `[${this.name}] ${message}`;
+                logContainer.appendChild(entry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
 
-            const monitor = document.createElement('aurora-performance-monitor');
-            monitor.hass = mockHass;
-            container.appendChild(monitor);
+            smoothMetrics(newMetrics) {
+                const smoothingFactor = 0.02; // Reduced significantly for much smoother transitions
+                const smoothedMetrics = {};
 
-            logMessage(`Running scenario: ${scenarioName}`);
-            scenario.setup(mockHass);
+                Object.keys(newMetrics).forEach(key => {
+                    smoothedMetrics[key] = this.previousMetrics[key] +
+                        (newMetrics[key] - this.previousMetrics[key]) * smoothingFactor;
+                });
 
-            await new Promise(resolve => setTimeout(resolve, scenario.duration));
-            const result = scenario.validate(mockHass.metrics, monitor);
-            updateTestResults(scenarioName, result);
-            logMessage(`Completed scenario: ${scenarioName}`, result.status === 'passed' ? 'success' : 'error');
-        };
+                this.previousMetrics = smoothedMetrics;
+                return smoothedMetrics;
+            }
 
-        function updateTestResults(scenarioName, result) {
-            const resultsContainer = document.getElementById('testResults');
-            const card = document.createElement('div');
-            card.className = `scenario-card ${result.status}`;
+            setState(newState) {
+                this.state = { ...this.state, ...newState };
+                if (newState.metrics) {
+                    const smoothedMetrics = this.smoothMetrics(newState.metrics);
+                    this.metrics = smoothedMetrics;
+                    this.updateMetrics(smoothedMetrics);
+                    this.updateMetricsHistory(smoothedMetrics);
+                    window.testRunner.updateCharts();
+                }
+                if (typeof newState.progress !== 'undefined') {
+                    this.progress = newState.progress;
+                    this.updateProgress(this.progress);
+                }
+            }
 
-            card.innerHTML = `
-                <div class="scenario-header">
-                    <div class="scenario-name">${scenarioName}</div>
-                    <div class="scenario-status status-${result.status}">${result.status.toUpperCase()}</div>
-                </div>
-                <div class="metric-list">
-                    ${Object.entries(result.metrics).map(([key, value]) => `
+            _setupEventListeners() {
+                // Remove any existing listeners
+                this._cleanup();
+
+                // Add new listeners
+                this._eventListeners.set('metrics', (event) => {
+                    this.updateMetrics(event.detail);
+                });
+
+                // Attach listeners
+                this._eventListeners.forEach((handler, event) => {
+                    this.element?.addEventListener(event, handler);
+                });
+            }
+
+            _cleanup() {
+                // Remove all event listeners
+                if (this.element) {
+                    this._eventListeners.forEach((handler, event) => {
+                        this.element.removeEventListener(event, handler);
+                    });
+                }
+                this._eventListeners.clear();
+            }
+
+            updateUI() {
+                if (!this.element) return;
+                this.updateMetrics(this.metrics);
+                this.updateProgress(this.progress);
+            }
+
+            createCard() {
+                const card = document.createElement('div');
+                card.className = 'scenario-card';
+                card.innerHTML = `
+                    <div class="scenario-header">
+                        <span class="scenario-name">${this.name}</span>
+                        <span class="scenario-status status-${this.status}">${this.status.toUpperCase()}</span>
+                    </div>
+                    <div class="metric-list">
                         <div class="metric-item">
-                            <span>${key}</span>
-                            <span>${typeof value === 'number' ? value.toFixed(2) : value}</span>
+                            <span>CPU Usage</span>
+                            <span class="metric-value" data-metric="cpuUsage">0%</span>
                         </div>
-                    `).join('')}
-                </div>
-                ${result.warnings.length > 0 ? `
-                    <div class="warning-list">
-                        ${result.warnings.map(w => `<div class="warning-item">${w}</div>`).join('')}
+                        <div class="metric-item">
+                            <span>Memory Usage</span>
+                            <span class="metric-value" data-metric="memoryUsage">0%</span>
+                        </div>
+                        <div class="metric-item">
+                            <span>Network Load</span>
+                            <span class="metric-value" data-metric="networkLoad">0 Mbps</span>
+                        </div>
+                        <div class="metric-item">
+                            <span>Response Time</span>
+                            <span class="metric-value" data-metric="responseTime">0ms</span>
+                        </div>
                     </div>
-                ` : ''}
-                ${result.errors.length > 0 ? `
-                    <div class="error-list">
-                        ${result.errors.map(e => `<div class="error-item">${e}</div>`).join('')}
+                    <div class="scenario-progress">
+                        <div class="scenario-progress-bar"></div>
                     </div>
-                ` : ''}
-            `;
+                `;
+                this.element = card;
+                this._setupEventListeners();
+                return card;
+            }
 
-            resultsContainer.appendChild(card);
-            updateSummary();
+            destroy() {
+                this._cleanup();
+                if (this._animationFrameId) {
+                    clearTimeout(this._animationFrameId);
+                    this._animationFrameId = null;
+                }
+                this.element?.remove();
+                this.element = null;
+            }
+
+            updateMetrics(metrics) {
+                if (!this.element) return;
+
+                Object.entries(metrics).forEach(([key, value]) => {
+                    const element = this.element.querySelector(`[data-metric="${key}"]`);
+                    if (!element) return;
+
+                    let displayValue = value;
+                    let className = 'metric-value';
+
+                    switch (key) {
+                        case 'cpuUsage':
+                        case 'memoryUsage':
+                            if (value > 90) className += ' error';
+                            else if (value > 70) className += ' warning';
+                            displayValue = value.toFixed(1) + '%';
+                            break;
+                        case 'networkLoad':
+                            if (value > 900) className += ' error';
+                            else if (value > 700) className += ' warning';
+                            displayValue = value.toFixed(1) + ' Mbps';
+                            break;
+                        case 'responseTime':
+                            if (value > 1000) className += ' error';
+                            else if (value > 500) className += ' warning';
+                            displayValue = value.toFixed(0) + 'ms';
+                            break;
+                    }
+
+                    element.textContent = displayValue;
+                    element.className = className;
+                });
+            }
+
+            updateProgress(progress) {
+                if (!this.element) return;
+                const progressBar = this.element.querySelector('.scenario-progress-bar');
+                if (progressBar) {
+                    progressBar.style.width = `${progress}%`;
+                    progressBar.classList.toggle('running', progress > 0 && progress < 100);
+                }
+            }
+
+            setStatus(status) {
+                if (!this.element) return;
+                this.status = status;
+                const statusElement = this.element.querySelector('.scenario-status');
+                if (statusElement) {
+                    statusElement.className = `scenario-status status-${status}`;
+                    statusElement.textContent = status.toUpperCase();
+                }
+                this.element.className = `scenario-card ${status}`;
+            }
+
+            updateMetricsHistory(metrics) {
+                const timestamp = new Date();
+                this.metricsHistory.timestamps.push(timestamp);
+                this.metricsHistory.cpuUsage.push(metrics.cpuUsage);
+                this.metricsHistory.memoryUsage.push(metrics.memoryUsage);
+                this.metricsHistory.networkLoad.push(metrics.networkLoad);
+                this.metricsHistory.responseTime.push(metrics.responseTime);
+
+                // Keep only last 30 data points
+                const maxDataPoints = 30;
+                if (this.metricsHistory.timestamps.length > maxDataPoints) {
+                    this.metricsHistory.timestamps.shift();
+                    this.metricsHistory.cpuUsage.shift();
+                    this.metricsHistory.memoryUsage.shift();
+                    this.metricsHistory.networkLoad.shift();
+                    this.metricsHistory.responseTime.shift();
+                }
+            }
         }
 
-        function updateSummary() {
-            const cards = document.querySelectorAll('.scenario-card');
-            const total = cards.length;
-            const passed = document.querySelectorAll('.scenario-card.passed').length;
-            const failed = document.querySelectorAll('.scenario-card.failed').length;
-            const warnings = Array.from(document.querySelectorAll('.warning-item')).length;
+        // Initialize test runner after imports are complete
+        window.testRunner = {
+            scenarios: new Map(),
+            updateInterval: null,
+            isRunning: false,
+            _disposed: false,
+            charts: null,
 
-            document.getElementById('totalTests').textContent = total;
-            document.getElementById('passedTests').textContent = passed;
-            document.getElementById('failedTests').textContent = failed;
-            document.getElementById('warningCount').textContent = warnings;
-        }
+            initializeCharts() {
+                const monitorContainer = document.getElementById('monitor-container');
+                monitorContainer.innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; width: 100%; margin-bottom: 20px;">
+                        <div style="width: 100%; aspect-ratio: 16/9;">
+                            <canvas id="cpuMemoryChart"></canvas>
+                        </div>
+                        <div style="width: 100%; aspect-ratio: 16/9;">
+                            <canvas id="networkResponseChart"></canvas>
+                        </div>
+                    </div>
+                `;
 
-        function logMessage(message, type = 'info') {
-            const log = document.getElementById('testLog');
-            const entry = document.createElement('div');
-            entry.className = `entry ${type}`;
-            entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
-            log.appendChild(entry);
-            log.scrollTop = log.scrollHeight;
-        }
+                const cpuMemoryCtx = document.getElementById('cpuMemoryChart').getContext('2d');
+                const networkResponseCtx = document.getElementById('networkResponseChart').getContext('2d');
 
-        window.downloadLatestReport = () => {
-            if (window.testPerformanceMonitor.mockHass?.logger) {
-                window.testPerformanceMonitor.mockHass.logger.saveReport();
-            } else {
-                logMessage('No test results available', 'error');
+                const commonOptions = {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    animation: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'second',
+                                displayFormats: {
+                                    second: 'HH:mm:ss'
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'rgba(255, 255, 255, 0.8)'
+                            }
+                        }
+                    }
+                };
+
+                this.charts = {
+                    cpuMemory: new Chart(cpuMemoryCtx, {
+                        type: 'line',
+                        data: {
+                            datasets: [
+                                {
+                                    label: 'CPU Usage (%)',
+                                    borderColor: '#3b82f6',
+                                    data: []
+                                },
+                                {
+                                    label: 'Memory Usage (%)',
+                                    borderColor: '#10b981',
+                                    data: []
+                                }
+                            ]
+                        },
+                        options: {
+                            ...commonOptions,
+                            plugins: {
+                                ...commonOptions.plugins,
+                                title: {
+                                    display: true,
+                                    text: 'CPU & Memory Usage',
+                                    color: 'rgba(255, 255, 255, 0.8)'
+                                }
+                            }
+                        }
+                    }),
+                    networkResponse: new Chart(networkResponseCtx, {
+                        type: 'line',
+                        data: {
+                            datasets: [
+                                {
+                                    label: 'Network Load (Mbps)',
+                                    borderColor: '#8b5cf6',
+                                    data: []
+                                },
+                                {
+                                    label: 'Response Time (ms)',
+                                    borderColor: '#f59e0b',
+                                    data: []
+                                }
+                            ]
+                        },
+                        options: {
+                            ...commonOptions,
+                            plugins: {
+                                ...commonOptions.plugins,
+                                title: {
+                                    display: true,
+                                    text: 'Network & Response Time',
+                                    color: 'rgba(255, 255, 255, 0.8)'
+                                }
+                            }
+                        }
+                    })
+                };
+            },
+
+            updateCharts() {
+                if (!this.charts) return;
+
+                const activeScenario = Array.from(this.scenarios.values())
+                    .find(scenario => scenario.status === 'running');
+
+                if (!activeScenario) {
+                    // Clear charts if no active scenario
+                    this.charts.cpuMemory.data.datasets.forEach(dataset => dataset.data = []);
+                    this.charts.networkResponse.data.datasets.forEach(dataset => dataset.data = []);
+                } else {
+                    // Update CPU & Memory chart
+                    this.charts.cpuMemory.data.datasets[0].data = activeScenario.metricsHistory.timestamps.map((t, i) => ({
+                        x: t,
+                        y: activeScenario.metricsHistory.cpuUsage[i]
+                    }));
+                    this.charts.cpuMemory.data.datasets[1].data = activeScenario.metricsHistory.timestamps.map((t, i) => ({
+                        x: t,
+                        y: activeScenario.metricsHistory.memoryUsage[i]
+                    }));
+
+                    // Update Network & Response chart
+                    this.charts.networkResponse.data.datasets[0].data = activeScenario.metricsHistory.timestamps.map((t, i) => ({
+                        x: t,
+                        y: activeScenario.metricsHistory.networkLoad[i]
+                    }));
+                    this.charts.networkResponse.data.datasets[1].data = activeScenario.metricsHistory.timestamps.map((t, i) => ({
+                        x: t,
+                        y: activeScenario.metricsHistory.responseTime[i]
+                    }));
+                }
+
+                this.charts.cpuMemory.update();
+                this.charts.networkResponse.update();
+            },
+
+            dispose() {
+                this._disposed = true;
+                this.stopLiveUpdates();
+                this.clearScenarios();
+            },
+
+            async runTests() {
+                if (this.isRunning || this._disposed) return;
+                this.isRunning = true;
+
+                this.clearScenarios();
+                const scenarios = ['Normal Operation', 'High CPU Load', 'Network Issues', 'Critical System Load'];
+
+                for (const name of scenarios) {
+                    if (this._disposed) break;
+                    await this.runScenario(name);
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+
+                this.isRunning = false;
+            },
+
+            async runScenario(name) {
+                if (this.isRunning) {
+                    console.log('Test already running, please wait...');
+                    return;
+                }
+
+                // If running a single scenario, clear previous scenarios
+                if (this.scenarios.size > 0 && !this.isRunning) {
+                    this.clearScenarios();
+                }
+
+                if (this.scenarios.has(name)) {
+                    return;
+                }
+
+                const scenario = new TestScenario(name);
+                this.scenarios.set(name, scenario);
+
+                const resultsContainer = document.getElementById('testResults');
+                resultsContainer.appendChild(scenario.createCard());
+
+                // Update summary immediately when adding new scenario
+                this.updateSummary();
+
+                try {
+                    // Start live updates for this scenario
+                    this.startLiveUpdates();
+
+                    // Simulate the test run
+                    await this.simulateScenarioRun(scenario);
+                } catch (error) {
+                    console.error(`Error running scenario ${name}:`, error);
+                    scenario.setStatus('failed');
+                } finally {
+                    // Stop updates if no more running scenarios
+                    if (![...this.scenarios.values()].some(s => s.status === 'running')) {
+                        this.stopLiveUpdates();
+                    }
+                }
+            },
+
+            clearScenarios() {
+                this.scenarios.forEach(scenario => scenario.destroy());
+                this.scenarios.clear();
+                document.getElementById('testResults').innerHTML = '';
+                this.stopLiveUpdates();
+                // Reset summary
+                document.getElementById('totalTests').textContent = '0';
+                document.getElementById('passedTests').textContent = '0';
+                document.getElementById('failedTests').textContent = '0';
+                document.getElementById('warningCount').textContent = '0';
+                // Clear charts
+                if (this.charts) {
+                    this.charts.cpuMemory.data.datasets.forEach(dataset => dataset.data = []);
+                    this.charts.networkResponse.data.datasets.forEach(dataset => dataset.data = []);
+                    this.charts.cpuMemory.update();
+                    this.charts.networkResponse.update();
+                }
+            },
+
+            startLiveUpdates() {
+                if (this.updateInterval) {
+                    this.stopLiveUpdates();
+                }
+                // Update every 2 seconds
+                this.updateInterval = setInterval(() => this.updateAllScenarios(), 2000);
+            },
+
+            stopLiveUpdates() {
+                if (this.updateInterval) {
+                    clearInterval(this.updateInterval);
+                    this.updateInterval = null;
+                }
+            },
+
+            updateAllScenarios() {
+                this.scenarios.forEach(scenario => {
+                    if (scenario.status === 'running') {
+                        const metrics = this.generateRandomMetrics(scenario.name);
+                        scenario.setState({ metrics });
+                    }
+                });
+            },
+
+            generateRandomMetrics(scenarioName) {
+                let baseLoad;
+                switch (scenarioName) {
+                    case 'Critical System Load':
+                        baseLoad = 0.8;
+                        break;
+                    case 'High CPU Load':
+                        baseLoad = 0.6;
+                        break;
+                    case 'Network Issues':
+                        baseLoad = 0.4;
+                        break;
+                    default:
+                        baseLoad = 0.2;
+                }
+
+                // Add some randomness to the base load
+                const variation = () => (Math.random() - 0.5) * 0.2; // 20% variation
+                const baseWithVariation = baseLoad + variation();
+
+                // Generate metrics with more realistic variations
+                return {
+                    cpuUsage: Math.min(100, Math.max(0, (baseWithVariation * 100) + (Math.random() * 20 - 10))),
+                    memoryUsage: Math.min(100, Math.max(0, (baseWithVariation * 100) + (Math.random() * 15 - 7.5))),
+                    networkLoad: Math.max(0, baseWithVariation * 1000 + (Math.random() * 100 - 50)),
+                    responseTime: Math.max(0, baseWithVariation * 1000 + (Math.random() * 200 - 100))
+                };
+            },
+
+            async simulateScenarioRun(scenario) {
+                if (this._disposed) return;
+
+                scenario.setStatus('running');
+                this.updateSummary();
+
+                scenario.log('Starting test scenario', 'info');
+
+                const duration = scenario.duration * 1000;
+                const startTime = Date.now();
+                const updateInterval = 2000; // 2 seconds between progress updates
+
+                return new Promise(resolve => {
+                    const updateProgress = () => {
+                        if (this._disposed) {
+                            resolve();
+                            return;
+                        }
+
+                        const now = Date.now();
+                        const elapsed = now - startTime;
+                        const progress = Math.min(100, (elapsed / duration) * 100);
+
+                        // Only update if enough time has passed
+                        if (now - scenario.lastUpdateTime >= updateInterval) {
+                            const currentMetrics = this.generateRandomMetrics(scenario.name);
+                            scenario.setState({
+                                progress,
+                                metrics: currentMetrics
+                            });
+                            scenario.lastUpdateTime = now;
+
+                            // Log significant events
+                            if (progress >= 25 && progress < 26) {
+                                scenario.log('25% complete - Initial metrics gathered', 'info');
+                            } else if (progress >= 50 && progress < 51) {
+                                scenario.log('50% complete - Analyzing system behavior', 'info');
+                            } else if (progress >= 75 && progress < 76) {
+                                scenario.log('75% complete - Finalizing measurements', 'info');
+                            }
+
+                            // Check for warning conditions
+                            Object.entries(currentMetrics).forEach(([key, value]) => {
+                                if (key === 'cpuUsage' && value > 70) {
+                                    scenario.log(`High CPU usage detected: ${value.toFixed(1)}%`, 'warning');
+                                } else if (key === 'memoryUsage' && value > 70) {
+                                    scenario.log(`High memory usage detected: ${value.toFixed(1)}%`, 'warning');
+                                }
+                            });
+                        }
+
+                        if (progress < 100 && !this._disposed) {
+                            // Schedule next update with a longer delay
+                            scenario._animationFrameId = setTimeout(() => {
+                                requestAnimationFrame(updateProgress);
+                            }, 200); // Add 2 second delay between animation frames
+                        } else {
+                            const finalMetrics = this.generateRandomMetrics(scenario.name);
+                            scenario.setState({ metrics: finalMetrics });
+
+                            const hasError = finalMetrics.cpuUsage > 90 ||
+                                finalMetrics.memoryUsage > 90 ||
+                                finalMetrics.networkLoad > 900 ||
+                                finalMetrics.responseTime > 1000;
+
+                            const status = hasError ? 'failed' : 'passed';
+                            scenario.setStatus(status);
+                            scenario.log(`Test completed - Status: ${status.toUpperCase()}`, status);
+                            this.updateSummary();
+                            resolve();
+                        }
+                    };
+
+                    scenario._animationFrameId = setTimeout(() => {
+                        requestAnimationFrame(updateProgress);
+                    }, 500);
+                });
+            },
+
+            updateSummary() {
+                const cards = document.querySelectorAll('.scenario-card');
+                const total = this.scenarios.size;
+                const passed = document.querySelectorAll('.scenario-card.passed').length;
+                const failed = document.querySelectorAll('.scenario-card.failed').length;
+
+                // Count warnings from all metrics that are in warning state
+                const warnings = Array.from(cards).reduce((count, card) => {
+                    return count + Array.from(card.querySelectorAll('.metric-value.warning')).length;
+                }, 0);
+
+                document.getElementById('totalTests').textContent = total.toString();
+                document.getElementById('passedTests').textContent = passed.toString();
+                document.getElementById('failedTests').textContent = failed.toString();
+                document.getElementById('warningCount').textContent = warnings.toString();
+            },
+
+            downloadReport() {
+                const scenarios = Array.from(document.querySelectorAll('.scenario-card')).map(card => {
+                    const name = card.querySelector('.scenario-name').textContent;
+                    const status = card.querySelector('.scenario-status').textContent;
+                    const metrics = Array.from(card.querySelectorAll('.metric-item')).map(item => {
+                        const label = item.querySelector('span:first-child').textContent;
+                        const value = item.querySelector('.metric-value').textContent;
+                        return `${label}: ${value}`;
+                    });
+
+                    return `
+Scenario: ${name}
+Status: ${status}
+${metrics.join('\n')}
+`;
+                }).join('\n-------------------\n');
+
+                const summary = `
+Aurora Performance Monitor Test Report
+====================================
+Total Tests: ${document.getElementById('totalTests').textContent}
+Passed: ${document.getElementById('passedTests').textContent}
+Failed: ${document.getElementById('failedTests').textContent}
+Warnings: ${document.getElementById('warningCount').textContent}
+
+Detailed Results:
+================
+${scenarios}
+`;
+
+                const blob = new Blob([summary], { type: 'text/plain' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `aurora-test-report-${new Date().toISOString()}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
             }
         };
 
-        // Override console.log for test output
-        const originalLog = console.log;
-        console.log = (...args) => {
-            originalLog.apply(console, args);
-            logMessage(args.join(' '));
-        };
+        // Initialize test runner
+        document.addEventListener('DOMContentLoaded', () => {
+            const downloadButton = document.querySelector('.download-report button');
+            if (downloadButton) {
+                downloadButton.onclick = () => window.testRunner.downloadReport();
+            }
+            window.testRunner.initializeCharts();
+            console.log('Test runner initialized successfully');
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (window.testRunner) {
+                window.testRunner.dispose();
+            }
+        });
+
+        // Cleanup on visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && window.testRunner) {
+                window.testRunner.dispose();
+            }
+        });
     </script>
 </body>
 

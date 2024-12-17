@@ -1,0 +1,1 @@
+../../../frontend/aurora-performance-monitor.js

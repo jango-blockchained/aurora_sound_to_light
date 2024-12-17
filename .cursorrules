@@ -6,5 +6,4 @@
 - The project is part of the injected directory.
 - Inside the container, the project is at /config/custom_components/aurora_sound_to_light.
 - The project is volume-mounted, so file changes reflect in the container.
-- Prefix file names with `@` when referencing them.
-- Commit all project changes to git.
+- Commit all changes to git.

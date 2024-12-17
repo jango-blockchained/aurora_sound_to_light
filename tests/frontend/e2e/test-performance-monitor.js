@@ -133,7 +133,9 @@ class MockHomeAssistant {
                 activeEffects: Math.max(1, Math.min(8, this.metrics.activeEffects + (Math.random() > 0.8 ? Math.random() > 0.5 ? 1 : -1 : 0))),
                 networkLatency: this._vary(this.metrics.networkLatency, 5, 5, 500),
                 bufferHealth: this._vary(this.metrics.bufferHealth, 2, 0, 100),
-                dropoutRate: Math.max(0, Math.min(100, this.metrics.dropoutRate + (Math.random() - 0.5) * 0.2))
+                dropoutRate: Math.max(0, Math.min(100, this.metrics.dropoutRate + (Math.random() - 0.5) * 0.2)),
+                latency: this._vary(this.metrics.audioLatency, 5, 10, 100), // Add latency for performance monitor
+                timestamp: Date.now()
             };
 
             return { metrics: this.metrics };
@@ -164,7 +166,18 @@ const testScenarios = [
             const errors = [];
 
             if (metrics.cpuUsage > 50) warnings.push('CPU usage higher than expected for normal operation');
-            if (metrics.audioLatency > 30) warnings.push('Audio latency higher than optimal');
+            if (metrics.latency > 30) warnings.push('Audio latency higher than optimal');
+
+            // Check if alerts are present when they should be
+            if (metrics.cpuUsage > 80 && !monitor.alerts?.includes('High CPU Usage')) {
+                errors.push('Missing alert for high CPU usage');
+            }
+            if (metrics.memoryUsage > 85 && !monitor.alerts?.includes('High Memory Usage')) {
+                errors.push('Missing alert for high memory usage');
+            }
+            if (metrics.latency > 200 && !monitor.alerts?.includes('High Latency')) {
+                errors.push('Missing alert for high latency');
+            }
 
             return {
                 status: errors.length === 0 ? 'passed' : 'failed',
@@ -180,7 +193,7 @@ const testScenarios = [
         setup: (mock) => {
             mock.metrics.cpuUsage = 85;
             mock.metrics.memoryUsage = 75;
-            mock.metrics.audioLatency = 40;
+            mock.metrics.latency = 40;
             mock.logger.log('Setting up High CPU Load scenario', 'info', 'High CPU Load');
         },
         validate: (metrics, monitor) => {
@@ -188,7 +201,11 @@ const testScenarios = [
             const errors = [];
 
             if (metrics.cpuUsage < 70) errors.push('CPU load not high enough for scenario');
-            if (monitor.alerts.length === 0) warnings.push('No alerts generated for high CPU usage');
+
+            // Check for CPU alert
+            if (!monitor.alerts?.includes('High CPU Usage')) {
+                errors.push('No alert generated for high CPU usage');
+            }
 
             return {
                 status: errors.length === 0 ? 'passed' : 'failed',
@@ -205,6 +222,7 @@ const testScenarios = [
             mock.metrics.networkLatency = 250;
             mock.metrics.bufferHealth = 60;
             mock.metrics.dropoutRate = 2.5;
+            mock.metrics.latency = 250; // High latency for alert testing
             mock.logger.log('Setting up Network Issues scenario', 'info', 'Network Issues');
         },
         validate: (metrics, monitor) => {
@@ -213,6 +231,11 @@ const testScenarios = [
 
             if (metrics.networkLatency < 200) errors.push('Network latency not high enough for scenario');
             if (metrics.bufferHealth > 70) warnings.push('Buffer health too good for network issues scenario');
+
+            // Check for latency alert
+            if (!monitor.alerts?.includes('High Latency')) {
+                errors.push('No alert generated for high latency');
+            }
 
             return {
                 status: errors.length === 0 ? 'passed' : 'failed',
@@ -228,8 +251,7 @@ const testScenarios = [
         setup: (mock) => {
             mock.metrics.cpuUsage = 95;
             mock.metrics.memoryUsage = 90;
-            mock.metrics.audioLatency = 150;
-            mock.metrics.lightLatency = 200;
+            mock.metrics.latency = 250;
             mock.metrics.bufferHealth = 20;
             mock.logger.log('Setting up Critical System Load scenario', 'info', 'Critical System Load');
         },
@@ -238,8 +260,18 @@ const testScenarios = [
             const errors = [];
 
             if (metrics.cpuUsage < 90) errors.push('CPU usage not critical enough for scenario');
-            if (monitor.alerts.length === 0) errors.push('No alerts generated for critical system load');
             if (metrics.bufferHealth > 30) warnings.push('Buffer health too good for critical scenario');
+
+            // Check for all critical alerts
+            if (!monitor.alerts?.includes('High CPU Usage')) {
+                errors.push('No alert generated for critical CPU usage');
+            }
+            if (!monitor.alerts?.includes('High Memory Usage')) {
+                errors.push('No alert generated for critical memory usage');
+            }
+            if (!monitor.alerts?.includes('High Latency')) {
+                errors.push('No alert generated for critical latency');
+            }
 
             return {
                 status: errors.length === 0 ? 'passed' : 'failed',
@@ -251,48 +283,122 @@ const testScenarios = [
     }
 ];
 
-// Enhanced test runner
-async function runTests() {
-    const mockHass = new MockHomeAssistant();
-    window.testPerformanceMonitor.mockHass = mockHass;
-    const monitor = document.createElement('aurora-performance-monitor');
-    monitor.hass = mockHass;
-    document.body.appendChild(monitor);
+// Add test runner functionality
+const testPerformanceMonitor = {
+    MockHomeAssistant,
+    testScenarios,
+    mockHass: null,
 
-    mockHass.logger.log('Starting Performance Monitor tests...', 'info');
+    async runTests() {
+        this.mockHass = new MockHomeAssistant();
+        for (const scenario of testScenarios) {
+            await this.runScenario(scenario.name);
+        }
+    },
 
-    for (const scenario of testScenarios) {
-        mockHass.logger.log(`Running scenario: ${scenario.name}`, 'info', scenario.name);
-        scenario.setup(mockHass);
+    async runScenario(scenarioName) {
+        const scenario = testScenarios.find(s => s.name === scenarioName);
+        if (!scenario) {
+            console.error(`Scenario not found: ${scenarioName}`);
+            return;
+        }
+
+        if (!this.mockHass) {
+            this.mockHass = new MockHomeAssistant();
+        }
+
+        const container = document.getElementById('monitor-container');
+        container.innerHTML = '';
+
+        const monitor = document.createElement('aurora-performance-monitor');
+
+        // Set up the mock metrics before connecting the monitor
+        scenario.setup(this.mockHass);
+
+        // Create a proxy to intercept WebSocket calls
+        const mockHassProxy = new Proxy(this.mockHass, {
+            get: (target, prop) => {
+                if (prop === 'callWS') {
+                    return async (params) => {
+                        if (params.type === 'aurora_sound_to_light/get_performance_metrics') {
+                            return { metrics: target.metrics };
+                        }
+                        return target.callWS(params);
+                    };
+                }
+                return target[prop];
+            }
+        });
+
+        // Assign the proxied mock to the monitor
+        monitor.hass = mockHassProxy;
+        container.appendChild(monitor);
+
+        console.log(`Running scenario: ${scenarioName}`);
+
+        // Wait for the monitor to initialize and update
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         // Wait for scenario duration
         await new Promise(resolve => setTimeout(resolve, scenario.duration));
 
         // Validate scenario results
-        const result = scenario.validate(mockHass.metrics, monitor);
-        mockHass.logger.recordTestResult(scenario.name, result);
+        const result = scenario.validate(this.mockHass.metrics, monitor);
+        this.updateTestResults(scenarioName, result);
+        console.log(`Completed scenario: ${scenarioName}`, result.status === 'passed' ? 'success' : 'error');
 
-        // Log results
-        mockHass.logger.log(
-            `Scenario ${scenario.name} ${result.status} (Warnings: ${result.warnings.length}, Errors: ${result.errors.length})`,
-            result.status === 'passed' ? 'success' : 'error',
-            scenario.name
-        );
+        // Clean up
+        monitor.remove();
+    },
+
+    updateTestResults(scenarioName, result) {
+        const resultsContainer = document.getElementById('testResults');
+        const card = document.createElement('div');
+        card.className = `scenario-card ${result.status}`;
+
+        card.innerHTML = `
+            <div class="scenario-header">
+                <div class="scenario-name">${scenarioName}</div>
+                <div class="scenario-status status-${result.status}">${result.status.toUpperCase()}</div>
+            </div>
+            <div class="metric-list">
+                ${Object.entries(result.metrics).map(([key, value]) => `
+                    <div class="metric-item">
+                        <span>${key}</span>
+                        <span>${typeof value === 'number' ? value.toFixed(2) : value}</span>
+                    </div>
+                `).join('')}
+            </div>
+            ${result.warnings.length > 0 ? `
+                <div class="warning-list">
+                    ${result.warnings.map(w => `<div class="warning-item">${w}</div>`).join('')}
+                </div>
+            ` : ''}
+            ${result.errors.length > 0 ? `
+                <div class="error-list">
+                    ${result.errors.map(e => `<div class="error-item">${e}</div>`).join('')}
+                </div>
+            ` : ''}
+        `;
+
+        resultsContainer.appendChild(card);
+        this.updateSummary();
+    },
+
+    updateSummary() {
+        const cards = document.querySelectorAll('.scenario-card');
+        const total = cards.length;
+        const passed = document.querySelectorAll('.scenario-card.passed').length;
+        const failed = document.querySelectorAll('.scenario-card.failed').length;
+        const warnings = Array.from(document.querySelectorAll('.warning-item')).length;
+
+        document.getElementById('totalTests').textContent = total;
+        document.getElementById('passedTests').textContent = passed;
+        document.getElementById('failedTests').textContent = failed;
+        document.getElementById('warningCount').textContent = warnings;
     }
+};
 
-    mockHass.logger.log('Tests completed', 'info');
-
-    // Generate and save test report
-    const reportPath = await mockHass.logger.saveReport();
-    mockHass.logger.log(`Test report saved to: ${reportPath}`, 'info');
-}
-
-// Run tests when the page loads
-window.addEventListener('load', runTests);
-
-// Export for manual testing
-window.testPerformanceMonitor = {
-    runTests,
-    MockHomeAssistant,
-    testScenarios
-}; 
+// Export for global use
+window.testPerformanceMonitor = testPerformanceMonitor;
+export default testPerformanceMonitor; 
