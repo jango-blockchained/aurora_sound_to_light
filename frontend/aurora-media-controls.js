@@ -2,21 +2,29 @@ import {
     LitElement,
     html,
     css,
-} from "https://unpkg.com/lit-element@2.4.0/lit-element.js?module";
+} from "https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";
 
 class AuroraMediaControls extends LitElement {
     static get properties() {
         return {
             hass: { type: Object },
-            mediaPlayers: { type: Array },
-            selectedPlayer: { type: String },
-            volume: { type: Number },
-            inputSource: { type: String },
-            isPlaying: { type: Boolean },
-            currentTrack: { type: Object },
-            bufferSize: { type: Number },
-            microphoneGain: { type: Number }
+            _state: { type: Object, state: true },
+            _sources: { type: Array, state: true },
+            _loading: { type: Boolean, state: true }
         };
+    }
+
+    constructor() {
+        super();
+        this._state = {
+            isPlaying: false,
+            volume: 50,
+            currentSource: null,
+            connectionStatus: 'disconnected'
+        };
+        this._sources = [];
+        this._loading = false;
+        this._connectionError = null;
     }
 
     static get styles() {
@@ -24,9 +32,6 @@ class AuroraMediaControls extends LitElement {
             :host {
                 display: block;
                 padding: 16px;
-                background: var(--card-background-color, #fff);
-                border-radius: var(--ha-card-border-radius, 4px);
-                box-shadow: var(--ha-card-box-shadow, 0 2px 2px rgba(0, 0, 0, 0.1));
             }
 
             .controls-container {
@@ -35,36 +40,21 @@ class AuroraMediaControls extends LitElement {
                 gap: 16px;
             }
 
-            .header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 16px;
-            }
-
-            .title {
-                font-size: 1.2em;
-                font-weight: 500;
-                color: var(--primary-text-color);
-            }
-
-            .player-selector {
-                width: 100%;
-                padding: 8px;
-                border-radius: 4px;
-                border: 1px solid var(--divider-color);
-            }
-
-            .control-row {
-                display: flex;
-                align-items: center;
-                gap: 16px;
-            }
-
             .playback-controls {
                 display: flex;
+                align-items: center;
                 justify-content: center;
                 gap: 16px;
+            }
+
+            .volume-control {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .source-selector {
+                width: 100%;
             }
 
             button {
@@ -74,7 +64,10 @@ class AuroraMediaControls extends LitElement {
                 background: var(--primary-color);
                 color: white;
                 cursor: pointer;
-                transition: background 0.3s ease;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                transition: background-color 0.3s ease;
             }
 
             button:hover {
@@ -82,320 +75,276 @@ class AuroraMediaControls extends LitElement {
             }
 
             button:disabled {
-                background: var(--disabled-color);
+                background: var(--disabled-color, #ccc);
                 cursor: not-allowed;
             }
 
-            .volume-slider {
-                flex: 1;
-                height: 36px;
-            }
-
-            .source-switch {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .track-info {
-                padding: 8px;
-                background: var(--secondary-background-color);
-                border-radius: 4px;
-                margin-top: 16px;
-            }
-
-            .track-info .title {
-                font-weight: bold;
-            }
-
-            .track-info .artist {
-                color: var(--secondary-text-color);
-            }
-
-            .settings-row {
-                display: flex;
-                align-items: center;
-                gap: 16px;
-                margin-top: 16px;
-            }
-
-            .settings-label {
-                min-width: 120px;
-                color: var(--primary-text-color);
+            .material-symbols-rounded {
+                font-size: 24px;
             }
 
             input[type="range"] {
                 flex: 1;
                 height: 4px;
                 border-radius: 2px;
-                background: var(--primary-color);
+                background: var(--primary-color-light);
             }
 
-            input[type="range"]::-webkit-slider-thumb {
-                -webkit-appearance: none;
-                width: 16px;
-                height: 16px;
+            select {
+                width: 100%;
+                padding: 8px;
+                border-radius: 4px;
+                border: 1px solid var(--divider-color, #ccc);
+                background: var(--card-background-color, #fff);
+                color: var(--primary-text-color);
+            }
+
+            .loading {
+                opacity: 0.7;
+                pointer-events: none;
+            }
+
+            .status-indicator {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 0.9em;
+                color: var(--secondary-text-color);
+            }
+
+            .status-dot {
+                width: 8px;
+                height: 8px;
                 border-radius: 50%;
-                background: var(--primary-color);
-                cursor: pointer;
+                background: var(--error-color);
+            }
+
+            .status-dot.active {
+                background: var(--success-color);
+            }
+
+            .error-message {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 16px;
+                background: var(--error-color);
+                color: white;
+                border-radius: 4px;
+                margin-bottom: 16px;
+            }
+
+            .connection-status {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                font-size: 0.9em;
+                margin-bottom: 8px;
+                padding: 4px 8px;
+                border-radius: 4px;
+            }
+
+            .connection-status.connected {
+                color: var(--success-color);
+            }
+
+            .connection-status.disconnected {
+                color: var(--error-color);
+            }
+
+            .material-symbols-rounded {
+                font-size: 18px;
             }
         `;
     }
 
-    constructor() {
-        super();
-        this.mediaPlayers = [];
-        this.selectedPlayer = '';
-        this.volume = 1.0;
-        this.inputSource = 'media_player';
-        this.isPlaying = false;
-        this.currentTrack = {
-            title: '',
-            artist: '',
-            album: '',
-            duration: 0,
-            position: 0
-        };
-        this.bufferSize = 2048;
-        this.microphoneGain = 1.0;
+    async firstUpdated() {
+        if (this.hass) {
+            try {
+                await this._initializeConnection();
+                await this._fetchSources();
+                await this._fetchState();
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                this._connectionError = error.message;
+                this._state.connectionStatus = 'error';
+            }
+        }
     }
 
-    firstUpdated() {
-        this._initializeMediaPlayers();
-        this._setupAudioContext();
+    updated(changedProps) {
+        if (changedProps.has('hass') && this.hass) {
+            this._fetchSources();
+            this._fetchState();
+        }
+    }
+
+    async _fetchSources() {
+        try {
+            const response = await this.hass.callWS({
+                type: 'aurora_sound_to_light/get_audio_sources'
+            });
+            this._sources = response.sources || [];
+            if (this._sources.length > 0 && !this._state.currentSource) {
+                this._state = {
+                    ...this._state,
+                    currentSource: this._sources[0]
+                };
+            }
+        } catch (error) {
+            console.error('Failed to fetch audio sources:', error);
+        }
+    }
+
+    async _fetchState() {
+        try {
+            const response = await this.hass.callWS({
+                type: 'aurora_sound_to_light/get_state'
+            });
+            this._state = {
+                ...this._state,
+                isPlaying: response.isPlaying || false,
+                volume: response.volume || 50,
+                currentSource: response.currentSource || this._state.currentSource
+            };
+        } catch (error) {
+            console.error('Failed to fetch state:', error);
+        }
+    }
+
+    async _handlePlayPause() {
+        this._loading = true;
+        try {
+            await this.hass.callService('aurora_sound_to_light',
+                this._state.isPlaying ? 'stop_audio' : 'start_audio',
+                { source: this._state.currentSource }
+            );
+            this._state = {
+                ...this._state,
+                isPlaying: !this._state.isPlaying
+            };
+        } catch (error) {
+            console.error('Failed to toggle playback:', error);
+        } finally {
+            this._loading = false;
+        }
+    }
+
+    async _handleVolumeChange(e) {
+        const volume = parseInt(e.target.value);
+        try {
+            await this.hass.callService('aurora_sound_to_light', 'set_volume', {
+                volume
+            });
+            this._state = {
+                ...this._state,
+                volume
+            };
+        } catch (error) {
+            console.error('Failed to update volume:', error);
+        }
+    }
+
+    async _handleSourceChange(e) {
+        const source = e.target.value;
+        this._loading = true;
+        try {
+            await this.hass.callService('aurora_sound_to_light', 'set_audio_source', {
+                source
+            });
+            this._state = {
+                ...this._state,
+                currentSource: source
+            };
+            if (this._state.isPlaying) {
+                await this._handlePlayPause();
+            }
+        } catch (error) {
+            console.error('Failed to change audio source:', error);
+        } finally {
+            this._loading = false;
+        }
+    }
+
+    async _initializeConnection() {
+        try {
+            await this.hass.callWS({
+                type: 'aurora_sound_to_light/ping'
+            });
+            this._state.connectionStatus = 'connected';
+            this._connectionError = null;
+        } catch (error) {
+            this._state.connectionStatus = 'error';
+            this._connectionError = 'Failed to connect to Aurora service';
+            throw error;
+        }
     }
 
     render() {
+        if (!this.hass) return html`<div>Loading...</div>`;
+
+        if (this._connectionError) {
+            return html`
+                <div class="error-message">
+                    <span class="material-symbols-rounded">error</span>
+                    ${this._connectionError}
+                </div>
+            `;
+        }
+
         return html`
-            <div class="controls-container">
-                <div class="header">
-                    <div class="title">Media Controls</div>
-                </div>
-
-                <select class="player-selector" 
-                        .value=${this.selectedPlayer}
-                        @change=${this._handlePlayerChange}>
-                    <option value="">Select Media Player</option>
-                    ${this.mediaPlayers.map(player => html`
-                        <option value=${player.entity_id}>${player.name}</option>
-                    `)}
-                </select>
-
-                <div class="source-switch">
-                    <label>
-                        <input type="radio" 
-                               name="source" 
-                               value="media_player"
-                               .checked=${this.inputSource === 'media_player'}
-                               @change=${this._handleSourceChange}>
-                        Media Player
-                    </label>
-                    <label>
-                        <input type="radio" 
-                               name="source" 
-                               value="microphone"
-                               .checked=${this.inputSource === 'microphone'}
-                               @change=${this._handleSourceChange}>
-                        Microphone
-                    </label>
-                </div>
-
+            <div class="controls-container ${this._loading ? 'loading' : ''}">
+                ${this._state.connectionStatus === 'connected' ? html`
+                    <div class="connection-status connected">
+                        <span class="material-symbols-rounded">check_circle</span>
+                        Connected
+                    </div>
+                ` : html`
+                    <div class="connection-status disconnected">
+                        <span class="material-symbols-rounded">error</span>
+                        Disconnected
+                    </div>
+                `}
                 <div class="playback-controls">
-                    <button @click=${this._handlePrevious} 
-                            ?disabled=${!this.selectedPlayer || this.inputSource !== 'media_player'}>
-                        ⏮️
+                    <button @click=${this._handlePlayPause} ?disabled=${!this._state.currentSource}>
+                        <span class="material-symbols-rounded">
+                            ${this._state.isPlaying ? 'pause' : 'play_arrow'}
+                        </span>
+                        ${this._state.isPlaying ? 'Pause' : 'Play'}
                     </button>
-                    <button @click=${this._handlePlayPause}
-                            ?disabled=${!this.selectedPlayer && this.inputSource === 'media_player'}>
-                        ${this.isPlaying ? '⏸️' : '▶️'}
-                    </button>
-                    <button @click=${this._handleNext}
-                            ?disabled=${!this.selectedPlayer || this.inputSource !== 'media_player'}>
-                        ⏭️
-                    </button>
+                    <div class="status-indicator">
+                        <div class="status-dot ${this._state.isPlaying ? 'active' : ''}"></div>
+                        ${this._state.isPlaying ? 'Playing' : 'Stopped'}
+                    </div>
                 </div>
 
-                <div class="control-row">
-                    <span>Volume</span>
-                    <input type="range" 
-                           class="volume-slider"
-                           min="0" 
-                           max="1" 
-                           step="0.01"
-                           .value=${this.volume}
-                           @input=${this._handleVolumeChange}>
+                <div class="volume-control">
+                    <span class="material-symbols-rounded">
+                        ${this._state.volume === 0 ? 'volume_off' :
+                this._state.volume < 50 ? 'volume_down' : 'volume_up'}
+                    </span>
+                    <input type="range"
+                        min="0"
+                        max="100"
+                        .value=${this._state.volume}
+                        @change=${this._handleVolumeChange}
+                    />
+                    <span>${this._state.volume}%</span>
                 </div>
 
-                ${this.inputSource === 'microphone' ? html`
-                    <div class="settings-row">
-                        <span class="settings-label">Microphone Gain</span>
-                        <input type="range" 
-                               min="0" 
-                               max="2" 
-                               step="0.1"
-                               .value=${this.microphoneGain}
-                               @input=${this._handleGainChange}>
-                    </div>
-
-                    <div class="settings-row">
-                        <span class="settings-label">Buffer Size</span>
-                        <select @change=${this._handleBufferSizeChange}>
-                            ${[512, 1024, 2048, 4096, 8192].map(size => html`
-                                <option value=${size} ?selected=${this.bufferSize === size}>
-                                    ${size}
-                                </option>
-                            `)}
-                        </select>
-                    </div>
-                ` : ''}
-
-                ${this.currentTrack.title && this.inputSource === 'media_player' ? html`
-                    <div class="track-info">
-                        <div class="title">${this.currentTrack.title}</div>
-                        ${this.currentTrack.artist ? html`
-                            <div class="artist">${this.currentTrack.artist}</div>
+                <div class="source-selector">
+                    <select .value=${this._state.currentSource || ''}
+                            @change=${this._handleSourceChange}>
+                        ${!this._state.currentSource ? html`
+                            <option value="" disabled selected>Select audio source</option>
                         ` : ''}
-                    </div>
-                ` : ''}
+                        ${this._sources.map(source => html`
+                            <option value=${source}>${source}</option>
+                        `)}
+                    </select>
+                </div>
             </div>
         `;
-    }
-
-    _initializeMediaPlayers() {
-        if (this.hass) {
-            this.mediaPlayers = Object.entries(this.hass.states)
-                .filter(([entity_id]) => entity_id.startsWith('media_player.'))
-                .map(([entity_id, state]) => ({
-                    entity_id,
-                    name: state.attributes.friendly_name || entity_id.split('.')[1]
-                }));
-        }
-    }
-
-    async _setupAudioContext() {
-        try {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            this.gainNode = this.audioContext.createGain();
-            this.gainNode.connect(this.audioContext.destination);
-
-            if (this.inputSource === 'microphone') {
-                await this._setupMicrophone();
-            }
-        } catch (error) {
-            this._dispatchEvent('error', { message: 'Failed to initialize audio context' });
-        }
-    }
-
-    async _setupMicrophone() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const source = this.audioContext.createMediaStreamSource(stream);
-            source.connect(this.gainNode);
-        } catch (error) {
-            this._dispatchEvent('error', { message: 'Failed to access microphone' });
-        }
-    }
-
-    _handlePlayerChange(e) {
-        this.selectedPlayer = e.target.value;
-        this._dispatchEvent('player-change', { player: this.selectedPlayer });
-    }
-
-    _handleSourceChange(e) {
-        this.inputSource = e.target.value;
-        this._dispatchEvent('source-change', { source: this.inputSource });
-
-        if (this.inputSource === 'microphone') {
-            this._setupMicrophone();
-        }
-    }
-
-    _handlePlayPause() {
-        this.isPlaying = !this.isPlaying;
-
-        if (this.inputSource === 'media_player' && this.selectedPlayer) {
-            this._dispatchEvent('media-command', {
-                command: this.isPlaying ? 'play' : 'pause',
-                player: this.selectedPlayer
-            });
-        } else if (this.inputSource === 'microphone') {
-            if (this.isPlaying) {
-                this.audioContext.resume();
-            } else {
-                this.audioContext.suspend();
-            }
-        }
-    }
-
-    _handlePrevious() {
-        if (this.selectedPlayer) {
-            this._dispatchEvent('media-command', {
-                command: 'previous',
-                player: this.selectedPlayer
-            });
-        }
-    }
-
-    _handleNext() {
-        if (this.selectedPlayer) {
-            this._dispatchEvent('media-command', {
-                command: 'next',
-                player: this.selectedPlayer
-            });
-        }
-    }
-
-    _handleVolumeChange(e) {
-        this.volume = parseFloat(e.target.value);
-        this.gainNode.gain.value = this.volume;
-        this._dispatchEvent('volume-change', { volume: this.volume });
-    }
-
-    _handleGainChange(e) {
-        this.microphoneGain = parseFloat(e.target.value);
-        if (this.gainNode) {
-            this.gainNode.gain.value = this.microphoneGain;
-        }
-        this._dispatchEvent('gain-change', { gain: this.microphoneGain });
-    }
-
-    _handleBufferSizeChange(e) {
-        this.bufferSize = parseInt(e.target.value);
-        this._dispatchEvent('buffer-size-change', { bufferSize: this.bufferSize });
-    }
-
-    _dispatchEvent(type, detail) {
-        const event = new CustomEvent(`aurora-media-${type}`, {
-            detail,
-            bubbles: true,
-            composed: true
-        });
-        this.dispatchEvent(event);
-    }
-
-    // Update state from Home Assistant
-    updated(changedProperties) {
-        if (changedProperties.has('hass')) {
-            this._initializeMediaPlayers();
-            this._updatePlayerState();
-        }
-    }
-
-    _updatePlayerState() {
-        if (this.hass && this.selectedPlayer) {
-            const state = this.hass.states[this.selectedPlayer];
-            if (state) {
-                this.isPlaying = state.state === 'playing';
-                this.volume = state.attributes.volume_level || 1;
-                this.currentTrack = {
-                    title: state.attributes.media_title || '',
-                    artist: state.attributes.media_artist || '',
-                    album: state.attributes.media_album_name || '',
-                    duration: state.attributes.media_duration || 0,
-                    position: state.attributes.media_position || 0
-                };
-            }
-        }
     }
 }
 
