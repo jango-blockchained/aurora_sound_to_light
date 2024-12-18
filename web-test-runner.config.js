@@ -1,39 +1,40 @@
 import { playwrightLauncher } from '@web/test-runner-playwright';
 import { esbuildPlugin } from '@web/dev-server-esbuild';
+import { fromRollup } from '@web/dev-server-rollup';
+import rollupCommonjs from '@rollup/plugin-commonjs';
+
+const commonjs = fromRollup(rollupCommonjs);
 
 export default {
   files: [
-    'frontend/tests/unit/**/*.test.js',
-    'frontend/tests/integration/**/*.test.js',
-    'frontend/tests/e2e/**/*.test.js'
+    'tests/frontend/**/*.test.js'
   ],
   nodeResolve: true,
   plugins: [
-    esbuildPlugin({ ts: true, target: 'auto' })
+    esbuildPlugin({ ts: true, target: 'auto' }),
+    commonjs()
   ],
   browsers: [
     playwrightLauncher({ product: 'chromium' }),
   ],
   testFramework: {
+    path: '@web/test-runner-mocha',
     config: {
       ui: 'bdd',
-      timeout: '10000'
+      timeout: '60000'
     }
   },
   testRunnerHtml: testFramework => `
+    <!DOCTYPE html>
     <html>
       <head>
-        <style>
-          body {
-            margin: 0;
-            padding: 0;
-          }
-        </style>
         <script type="module">
           // Import test dependencies
           import '@open-wc/testing';
-          import 'chart.js';
-          import 'sinon';
+          import 'chai/chai.js';
+          
+          // Setup global test environment
+          window.process = { env: { NODE_ENV: 'test' } };
         </script>
       </head>
       <body>
@@ -41,16 +42,27 @@ export default {
       </body>
     </html>
   `,
-  exclude: ['**/node_modules/**/*.test.js'],
+  middleware: [
+    function rewriteBase(context, next) {
+      if (context.url.startsWith('/base/')) {
+        context.url = context.url.replace('/base/', '/');
+      }
+      return next();
+    },
+    function rewriteNodeModules(context, next) {
+      if (context.url.includes('node_modules')) {
+        context.url = context.url.replace('/node_modules/', '/');
+      }
+      return next();
+    }
+  ],
   coverageConfig: {
     include: [
-      'frontend/**/*.js',
-      'tests/frontend/**/*.js'
+      'frontend/**/*.js'
     ],
     exclude: [
       '**/node_modules/**',
-      'tests/frontend/setup/**',
-      '**/*.test.js',
+      'tests/**/*.js',
       '**/*.config.js'
     ],
     threshold: {
@@ -59,13 +71,5 @@ export default {
       functions: 80,
       lines: 80
     }
-  },
-  middleware: [
-    function rewriteImports(context, next) {
-      if (context.url.includes('/frontend/')) {
-        context.url = context.url.replace('/frontend/', '/');
-      }
-      return next();
-    }
-  ]
+  }
 }; 

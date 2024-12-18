@@ -62,21 +62,18 @@ aurora-sound-to-light/
 ├── tests/
 │   ├── README.md
 │   ├── conftest.py
+│   ├── requirements_test.txt
+│   ├── test_audio_processor.py
+│   ├── test_cache.py
+│   ├── test_light_controller.py
 │   ├── core/
 │   ├── frontend/
 │   │   ├── e2e/
-│   │   │   ├── aurora-core.e2e.test.js
-│   │   │   ├── serve.py
-│   │   │   ├── test-performance-monitor.html
-│   │   │   └── test-performance-monitor.js
+│   │   ├── integration/
+│   │   ├── setup/
 │   │   ├── unit/
-│   │   │   ├── aurora-effect-selector.test.js
-│   │   │   └── aurora-group-manager.test.js
-│   │   └── integration/
-│   ├── integration/
-│   ├── test_audio_processor.py
-│   ├── test_cache.py
-│   └── test_light_controller.py
+│   │   └── jest.config.js
+│   └── integration/
 ├── translations/
 └── web-test-runner.config.js
 ```

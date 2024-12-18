@@ -4,11 +4,21 @@ import os
 import sys
 from pathlib import Path
 
-# Get the root directory of the project (where custom_components is)
+# Get the root directory of the project
 root_dir = Path(__file__).parent.parent
 
-# Add the root directory to Python path so custom_components can be imported
+# Add the root directory to Python path so we can import custom_components
 sys.path.insert(0, str(root_dir))
+
+# Create custom_components directory if it doesn't exist
+custom_components_dir = root_dir / "custom_components"
+if not custom_components_dir.exists():
+    os.makedirs(custom_components_dir)
+
+# Create a symbolic link to the current directory in custom_components
+aurora_dir = custom_components_dir / "aurora_sound_to_light"
+if not aurora_dir.exists():
+    os.symlink(root_dir, aurora_dir)
 
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component

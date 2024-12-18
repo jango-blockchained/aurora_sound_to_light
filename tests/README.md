@@ -6,104 +6,78 @@ This directory contains all test files for the Aurora Sound to Light project. Th
 
 ```plaintext
 tests/
-├── frontend/
-│   ├── unit/                 # Unit tests for frontend components
-│   ├── integration/          # Integration tests for frontend
-│   ├── e2e/                  # End-to-end tests
-│   └── setup/               # Test setup and utilities
-├── backend/
-│   ├── conftest.py          # Pytest fixtures for backend
-│   ├── test_*.py            # Unit tests for backend components
-│   └── integration/         # Integration tests for backend
-└── README.md                # This file
+├── conftest.py              # Pytest fixtures and test configuration
+├── requirements_test.txt    # Test-specific dependencies
+├── core/                    # Core functionality tests
+├── frontend/               # Frontend-related tests
+│   ├── e2e/               # End-to-end tests
+│   ├── integration/       # Frontend integration tests
+│   ├── setup/            # Test setup and utilities
+│   ├── unit/             # Unit tests for frontend components
+│   └── jest.config.js    # Jest configuration for frontend tests
+├── integration/           # Backend integration tests
+├── test_audio_processor.py  # Audio processing unit tests
+├── test_cache.py           # Cache system unit tests
+├── test_light_controller.py # Light controller unit tests
+└── README.md               # This documentation file
 ```
 
 ## Test Categories
 
-### Overview
-The Aurora Sound to Light test suite provides comprehensive coverage of all system components:
+### Core Tests
+- Unit tests for fundamental system components
+- Located in `core/` directory
+- Focus on core business logic and data processing
 
-#### Core Components Tested
-- **Effect Engines**: Unit tests for various light effect implementations
-  - Beat detection algorithms
-  - Color pattern generation
-  - Effect chain processing
-- **Audio Processing**: Tests for audio input handling and processing
-  - FFT analysis
-  - Buffer management
-  - Input source handling
-- **Light Control**: Verification of light control commands and state management
-  - Protocol support
-  - State transitions
-  - Latency optimization
-- **Frontend Components**: Tests for core UI elements
-  - `AuroraDashboard`: Layout and component integration
-  - `AuroraMediaControls`: Playback and source control
-  - `AuroraVisualizer`: Audio visualization modes
-  - `AuroraPerformanceMonitor`: System metrics and alerts
-- **System Integration**: Tests for Home Assistant integration
-  - WebSocket communication
-  - Service calls
-  - State synchronization
-- **Performance Monitoring**: System health tracking
-  - Metric collection
-  - Alert thresholds
-  - Resource utilization
-
-### Frontend Tests
+### Frontend Tests (`frontend/`)
 
 1. **Unit Tests** (`frontend/unit/`)
-   - Test individual components in isolation
-   - Focus on component logic and rendering
-   - Naming convention: `component-name.test.js`
+   - Individual component testing
+   - Component logic and rendering
+   - Isolated component behavior
 
 2. **Integration Tests** (`frontend/integration/`)
-   - Test component interactions
-   - Focus on component communication and state management
-   - Naming convention: `component-name.integration.test.js`
+   - Component interaction testing
+   - State management
+   - Cross-component communication
 
 3. **End-to-End Tests** (`frontend/e2e/`)
-   - Test complete user workflows
-   - Focus on user interactions and system behavior
-   - Naming convention: `feature-name.e2e.test.js`
+   - Complete user workflow testing
+   - Full system interaction
+   - User experience validation
+
+4. **Setup** (`frontend/setup/`)
+   - Test utilities and helpers
+   - Common test configurations
+   - Shared test resources
 
 ### Backend Tests
 
-1. **Unit Tests** (`backend/`)
-   - Test individual Python modules and functions
-   - Focus on business logic and data processing
-   - Naming convention: `test_module_name.py`
+1. **Unit Tests** (Root level `test_*.py` files)
+   - `test_audio_processor.py`: Audio processing functionality
+   - `test_cache.py`: Caching system
+   - `test_light_controller.py`: Light control operations
 
-2. **Integration Tests** (`backend/integration/`)
-   - Test interactions between multiple backend components
-   - Focus on API endpoints and data flow
-   - Naming convention: `test_feature_name.py`
+2. **Integration Tests** (`integration/`)
+   - System component interaction
+   - API endpoint testing
+   - Data flow validation
 
 ## Running Tests
 
 ### Frontend Tests
 
 ```bash
-# Run all tests
-npm test
-
 # Run all frontend tests
 npm run test:frontend
 
-# Run unit tests only
+# Run specific test categories
 npm run test:frontend:unit
-
-# Run integration tests only
 npm run test:frontend:integration
-
-# Run end-to-end tests only
 npm run test:frontend:e2e
 
-# Run tests with coverage
+# Run with coverage
 npm run test:coverage
-
-# Run tests in watch mode
-npm run test:watch
 ```
 
 ### Backend Tests
@@ -113,9 +87,9 @@ npm run test:watch
 pytest
 
 # Run specific test file
-pytest tests/backend/test_audio_processor.py
+pytest tests/test_audio_processor.py
 
-# Run tests with coverage
+# Run with coverage
 pytest --cov=custom_components/aurora_sound_to_light
 ```
 
@@ -124,27 +98,16 @@ pytest --cov=custom_components/aurora_sound_to_light
 ### Frontend Test Guidelines
 
 1. **Component Tests**
-   - Use `@open-wc/testing` for component testing
-   - Mock external dependencies (Home Assistant, WebSocket)
-   - Test both success and error scenarios
-   - Verify DOM updates and event handling
-
-2. **Test Structure**
    ```javascript
    describe('ComponentName', () => {
        let element;
-       let mockHass;
-
+       
        beforeEach(async () => {
-           // Setup
+           element = await fixture(html`<component-name></component-name>`);
        });
 
-       afterEach(() => {
-           // Cleanup
-       });
-
-       it('should do something specific', async () => {
-           // Test case
+       it('should have expected properties', () => {
+           expect(element).to.have.property('propertyName');
        });
    });
    ```
@@ -152,16 +115,10 @@ pytest --cov=custom_components/aurora_sound_to_light
 ### Backend Test Guidelines
 
 1. **Python Tests**
-   - Use pytest fixtures for common setup
-   - Mock external services and API calls
-   - Test edge cases and error handling
-   - Follow AAA pattern (Arrange, Act, Assert)
-
-2. **Test Structure**
    ```python
-   def test_function_name(fixture1, fixture2):
+   def test_function_name(setup_fixture):
        # Arrange
-       input_data = ...
+       input_data = prepare_test_data()
 
        # Act
        result = function_under_test(input_data)
@@ -170,74 +127,34 @@ pytest --cov=custom_components/aurora_sound_to_light
        assert result == expected_output
    ```
 
-## Code Coverage
-
-- Frontend coverage reports are generated in the `coverage/` directory
-- Backend coverage is tracked using pytest-cov
-- Minimum coverage requirements:
-  - Statements: 80%
-  - Branches: 80%
-  - Functions: 80%
-  - Lines: 80%
-
-## Test Scenarios
-
-### Performance Monitor Test Suite
-The performance monitoring system includes specific test scenarios:
-
-1. **Normal Operation**
-   - Validates baseline metrics
-   - Verifies alert thresholds
-   - Monitors system stability
-
-2. **High CPU Load**
-   - Tests system behavior under heavy load
-   - Validates alert generation
-   - Monitors resource management
-
-3. **Network Issues**
-   - Simulates connectivity problems
-   - Tests buffer health monitoring
-   - Validates latency alerts
-
-4. **Critical System Load**
-   - Tests extreme resource utilization
-   - Validates multiple alert conditions
-   - Monitors system recovery
-
 ## Best Practices
 
 1. **Test Independence**
-   - Each test should be independent and not rely on other tests
-   - Clean up any modifications after each test
-   - Use fresh fixtures for each test
+   - Each test should be self-contained
+   - Use appropriate fixtures
+   - Clean up after tests
 
-2. **Meaningful Assertions**
-   - Write clear, specific assertions
-   - Test both positive and negative cases
-   - Include error handling tests
+2. **Code Coverage**
+   - Maintain minimum 80% coverage
+   - Test edge cases
+   - Include error scenarios
 
-3. **Mock External Dependencies**
-   - Mock Home Assistant API calls
-   - Mock WebSocket connections
-   - Mock file system operations
+3. **Naming Conventions**
+   - Backend: `test_*.py`
+   - Frontend: `*.test.js`
+   - Descriptive test names
 
-4. **Maintainable Tests**
-   - Keep tests focused and concise
-   - Use descriptive test names
-   - Document complex test setups
-
-5. **Continuous Integration**
-   - All tests must pass before merging
-   - Coverage requirements must be met
-   - Linting rules must be followed
+4. **Documentation**
+   - Document test purpose
+   - Include setup requirements
+   - Explain complex test scenarios
 
 ## Contributing
 
-When adding new features or modifying existing ones:
+1. Write tests for new features
+2. Maintain existing test coverage
+3. Follow established patterns
+4. Update documentation
+5. Ensure CI/CD compliance
 
-1. Write tests before implementing features (TDD approach)
-2. Ensure all tests pass locally before pushing
-3. Maintain or improve code coverage
-4. Follow existing naming conventions and patterns
-5. Update test documentation as needed
+For detailed information about specific test implementations, refer to the respective test files and their documentation.
