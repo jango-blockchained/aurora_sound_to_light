@@ -1,9 +1,87 @@
-- Verify project structure and files before creating new files.
-- Update `_files.md` with new files.
-- Check `_files.md` before creating new files.
-- Review `_tasks.md` before starting and after finishing tasks.
-- Remember, Home Assistant runs in a Docker container named `homeassistant`.
-- The project is part of the injected directory.
-- Inside the container, the project is at /config/custom_components/aurora_sound_to_light.
-- The project is volume-mounted, so file changes reflect in the container.
-- Commit all changes to git.
+# Task Management Cursor Rules
+
+## General Principles
+- Use clear, actionable descriptions
+- Prioritize tasks with urgency and importance
+- Break down complex tasks into smaller, manageable steps
+
+## Cursor Notation
+- `!` = High Priorit
+- `*` = In Progress
+- `?` = Needs Clarification
+- `~` = Blocked/Waiting
+- `✓` = Completed
+- `>` = Delegated/Assigned
+
+### Example Syntax
+
+! Implement core feature
+* Refactor authentication module
+? Clarify API endpoint requirements
+~ Waiting on external dependency
+✓ Completed minor bug fix
+> Assigned to team member
+
+## Task Lifecycle
+- Start with a clear, concise task description
+- Add context and specific requirements
+- Track dependencies and blockers
+- Update status regularly
+
+## Best Practices
+- Review and update tasks frequently
+- Use consistent formatting
+- Keep tasks specific and measurable
+- Include estimated time or complexity
+- Link to relevant documentation or tickets
+
+## Project-Specific Notes
+- Home Assistant runs in `homeassistant` Docker container
+- Project located at `/config/custom_components/aurora_sound_to_light`
+- Volume-mounted for direct file synchronization
+
+## Tasks File (`@tasks`) Guidelines
+
+### Purpose
+- Comprehensive project tracking document
+- High-level overview of project progress
+- Serves as a roadmap and status tracker
+
+### When to Review
+- Weekly project sync meetings
+- Before starting new development cycles
+- When onboarding new team members
+- During sprint planning
+- Monthly project retrospectives
+
+### When to Update
+- After completing significant milestones
+- When adding new features or components
+- Resolving major blockers
+- Adjusting project scope
+- Reflecting changes in project priorities
+
+### Update Best Practices
+- Use checkboxes `[ ]` and `[x]` for tracking
+- Add detailed subtasks
+- Include estimated timelines
+- Mark completed items
+- Add context for complex tasks
+- Use emoji for visual categorization
+
+### Notation Recommendations
+- `🚀` = Project Milestones
+- `🎯` = Core Components
+- `🎨` = Design/UI Tasks
+- `🧪` = Testing
+- `📚` = Documentation
+- `🔄` = Optimization
+- `🐛` = Bug Tracking
+- `🔒` = Security Tasks
+
+### Tracking Workflow
+1. Break down large tasks into smaller, manageable items
+2. Prioritize tasks using cursor notation
+3. Update status regularly
+4. Maintain clear, actionable descriptions
+5. Link to relevant issues or pull requests
