@@ -1,36 +1,17 @@
 {
     "name": "aurora-sound-to-light",
     "version": "1.0.0",
-    "description": "Home Assistant custom component for sound-reactive lighting effects",
+    "description": "Aurora Sound to Light Home Assistant Component",
+    "type": "module",
     "scripts": {
-        "test": "web-test-runner",
-        "test:unit": "web-test-runner tests/frontend/unit/**/*.test.js --coverage",
-        "test:integration": "web-test-runner tests/frontend/integration/**/*.integration.test.js",
-        "test:e2e": "web-test-runner tests/frontend/e2e/**/*.e2e.test.js",
-        "test:watch": "web-test-runner --watch",
-        "test:coverage": "web-test-runner --coverage",
-        "lint": "eslint 'frontend/**/*.js'",
-        "format": "prettier --write 'frontend/**/*.{js,css}'"
-    },
-    "dependencies": {
-        "@material/mwc-button": "^0.27.0",
-        "@material/mwc-icon-button": "^0.27.0",
-        "@material/mwc-list": "^0.27.0",
-        "@material/mwc-menu": "^0.27.0",
-        "chart.js": "^4.0.0",
-        "lit": "^2.7.0"
+        "test": "web-test-runner \"frontend/**/*.test.js\" --node-resolve",
+        "test:watch": "web-test-runner \"frontend/**/*.test.js\" --node-resolve --watch"
     },
     "devDependencies": {
         "@open-wc/testing": "^3.1.7",
-        "@web/dev-server-esbuild": "^0.4.1",
-        "@web/dev-server-import-maps": "^0.1.1",
         "@web/test-runner": "^0.15.1",
-        "@web/test-runner-playwright": "^0.10.0",
-        "chartjs-adapter-date-fns": "^3.0.0",
-        "eslint": "^8.0.0",
-        "prettier": "^2.8.0",
-        "sinon": "^15.0.0"
-    },
-    "author": "Your Name",
-    "license": "MIT"
+        "@web/test-runner-commands": "^0.6.5",
+        "@web/test-runner-playwright": "^0.11.0",
+        "sinon": "^15.0.3"
+    }
 }
