@@ -5,8 +5,9 @@
     "type": "module",
     "scripts": {
         "test": "npm run test:frontend && npm run test:python",
-        "test:frontend": "npm run test:frontend:unit && npm run test:frontend:e2e",
+        "test:frontend": "web-test-runner \"tests/frontend/**/*.test.js\" --node-resolve",
         "test:frontend:unit": "web-test-runner \"tests/frontend/unit/**/*.test.js\" --node-resolve",
+        "test:frontend:integration": "web-test-runner \"tests/frontend/integration/**/*.test.js\" --node-resolve",
         "test:frontend:e2e": "web-test-runner \"tests/frontend/e2e/**/*.test.js\" --node-resolve",
         "test:frontend:watch": "web-test-runner \"tests/frontend/**/*.test.js\" --node-resolve --watch",
         "test:frontend:coverage": "web-test-runner \"tests/frontend/**/*.test.js\" --node-resolve --coverage",
