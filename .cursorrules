@@ -1,4 +1,11 @@
-# Task Management Cursor Rules
+# Cursor Rules
+
+## General Cursor Files
+
+! Use `@.cursorrules` to track rules
+! Use `@.cursorfiles` to track files
+! Use `@.cursortasks` to track tasks
+! Use `@.cursorignore` to track ignored files
 
 ## General Principles
 - Use clear, actionable descriptions
@@ -40,7 +47,7 @@
 - Project located at `/config/custom_components/aurora_sound_to_light`
 - Volume-mounted for direct file synchronization
 
-## Tasks File (`@tasks`) Guidelines
+## Tasks File @.cursortasks Guidelines
 
 ### Purpose
 - Comprehensive project tracking document

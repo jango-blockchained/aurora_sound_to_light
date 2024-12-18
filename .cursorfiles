@@ -1,0 +1,82 @@
+# Project structure
+
+```plaintext
+aurora-sound-to-light/
+├── .cursorignore
+├── .cursorrules
+├── .cursortasks
+├── .devcontainer/
+│   └── devcontainer.json
+├── .github/
+│   └── workflows/
+├── .pre-commit-config.yaml
+├── ~~.pytest_cache/~~
+├── .vscode/
+├── __init__.py
+├── ~~__pycache__/~~
+├── audio_processor.py
+├── ~~aurora_sound_to_light.egg-info/~~
+├── cache.py
+├── codecov.yml
+├── config_flow.py
+├── const.py
+├── core/
+├── ~~coverage/~~
+├── docs/
+├── effect_creator.py
+├── effects/
+├── effects.py
+├── effects_impl.py
+├── frontend/
+│   ├── .babelrc
+│   ├── aurora-dashboard.js
+│   ├── aurora-effect-selector.js
+│   ├── aurora-group-manager.js
+│   ├── aurora-media-controls.js
+│   ├── aurora-performance-monitor.js
+│   ├── aurora-visualizer.js
+│   ├── babel.config.js
+│   ├── index.html
+│   ├── index.js
+│   ├── jest.config.js
+│   ├── ~~node_modules/~~
+│   ├── ~~package-lock.json~~
+│   └── package.json
+├── light.py
+├── light_controller.py
+├── manifest.json
+├── ~~node_modules/~~
+├── optimization.py
+├── ~~package-lock.json~~
+├── package.json
+├── panel.py
+├── pyproject.toml
+├── README.md
+├── RELEASE.md
+├── requirements_test.txt
+├── security.py
+├── sensor.py
+├── services.py
+├── services.yaml
+├── setup.py
+├── tests/
+│   ├── README.md
+│   ├── conftest.py
+│   ├── core/
+│   ├── frontend/
+│   │   ├── e2e/
+│   │   │   ├── aurora-core.e2e.test.js
+│   │   │   ├── serve.py
+│   │   │   ├── test-performance-monitor.html
+│   │   │   └── test-performance-monitor.js
+│   │   ├── unit/
+│   │   │   ├── aurora-effect-selector.test.js
+│   │   │   └── aurora-group-manager.test.js
+│   │   └── integration/
+│   ├── integration/
+│   ├── test_audio_processor.py
+│   ├── test_cache.py
+│   └── test_light_controller.py
+├── translations/
+└── web-test-runner.config.js
+```
