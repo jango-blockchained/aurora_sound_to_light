@@ -2,21 +2,31 @@ import {
     LitElement,
     html,
     css,
-} from "https://unpkg.com/lit-element@2.4.0/lit-element.js?module";
+} from "https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";
 
 class AuroraEffectSelector extends LitElement {
     static get properties() {
         return {
             hass: { type: Object },
-            effects: { type: Array },
-            selectedEffect: { type: Object },
-            presets: { type: Array },
-            blendMode: { type: String },
-            transitionTime: { type: Number },
-            isPreviewActive: { type: Boolean },
-            genreMode: { type: Boolean },
-            currentGenre: { type: String }
+            _effects: { type: Array, state: true },
+            _selectedEffect: { type: Object, state: true },
+            _presets: { type: Array, state: true },
+            _loading: { type: Boolean, state: true },
+            _editingPreset: { type: Boolean, state: true },
+            _connectionError: { type: String, state: true },
+            _connectionStatus: { type: String, state: true }
         };
+    }
+
+    constructor() {
+        super();
+        this._effects = [];
+        this._selectedEffect = null;
+        this._presets = [];
+        this._loading = false;
+        this._editingPreset = false;
+        this._connectionError = null;
+        this._connectionStatus = 'disconnected';
     }
 
     static get styles() {
@@ -24,81 +34,96 @@ class AuroraEffectSelector extends LitElement {
             :host {
                 display: block;
                 padding: 16px;
-                background: var(--card-background-color, #fff);
-                border-radius: var(--ha-card-border-radius, 4px);
-                box-shadow: var(--ha-card-box-shadow, 0 2px 2px rgba(0, 0, 0, 0.1));
             }
 
-            .effect-grid {
+            .effect-container {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
                 gap: 16px;
-                margin-bottom: 16px;
+            }
+
+            .effect-list {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 8px;
             }
 
             .effect-card {
-                position: relative;
-                padding: 16px;
-                background: var(--primary-background-color, #f5f5f5);
+                background: var(--card-background-color, #fff);
                 border-radius: 8px;
+                padding: 16px;
                 cursor: pointer;
-                transition: transform 0.2s ease, box-shadow 0.2s ease;
+                border: 2px solid transparent;
+                transition: all 0.3s ease;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 8px;
             }
 
             .effect-card:hover {
                 transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                box-shadow: var(--shadow-elevation-2dp);
             }
 
             .effect-card.selected {
-                border: 2px solid var(--primary-color);
+                border-color: var(--primary-color);
+                background: var(--primary-color-light);
             }
 
-            .effect-card .preview {
-                width: 100%;
-                height: 100px;
-                border-radius: 4px;
-                margin-bottom: 8px;
-                background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+            .effect-icon {
+                font-size: 24px;
+                color: var(--primary-color);
             }
 
             .effect-name {
                 font-weight: 500;
-                margin-bottom: 4px;
+                text-align: center;
             }
 
-            .effect-description {
-                font-size: 0.9em;
-                color: var(--secondary-text-color);
-            }
-
-            .parameters-panel {
-                background: var(--primary-background-color, #f5f5f5);
+            .config-panel {
+                background: var(--card-background-color, #fff);
                 border-radius: 8px;
                 padding: 16px;
                 margin-top: 16px;
             }
 
-            .parameter-row {
-                display: flex;
-                align-items: center;
-                margin-bottom: 12px;
-            }
-
-            .parameter-label {
-                flex: 0 0 150px;
+            .config-title {
+                font-size: 1.1em;
                 font-weight: 500;
+                margin-bottom: 16px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
             }
 
-            .parameter-control {
-                flex: 1;
+            .config-grid {
+                display: grid;
+                gap: 16px;
+            }
+
+            .config-item {
+                display: grid;
+                gap: 8px;
+            }
+
+            label {
+                font-size: 0.9em;
+                color: var(--secondary-text-color);
+            }
+
+            input, select {
+                width: 100%;
+                padding: 8px;
+                border-radius: 4px;
+                border: 1px solid var(--divider-color, #ccc);
+                background: var(--card-background-color, #fff);
             }
 
             input[type="range"] {
-                width: 100%;
+                -webkit-appearance: none;
                 height: 4px;
                 border-radius: 2px;
-                background: var(--primary-color);
+                background: var(--primary-color-light);
             }
 
             input[type="range"]::-webkit-slider-thumb {
@@ -110,10 +135,36 @@ class AuroraEffectSelector extends LitElement {
                 cursor: pointer;
             }
 
-            .controls {
+            .preset-section {
+                margin-top: 16px;
+            }
+
+            .preset-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .preset-chip {
+                background: var(--primary-color-light);
+                border-radius: 16px;
+                padding: 4px 12px;
+                font-size: 0.9em;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+
+            .preset-chip:hover {
+                background: var(--primary-color);
+                color: white;
+            }
+
+            .preset-actions {
                 display: flex;
                 gap: 8px;
-                margin-top: 16px;
+                margin-top: 8px;
             }
 
             button {
@@ -123,7 +174,10 @@ class AuroraEffectSelector extends LitElement {
                 background: var(--primary-color);
                 color: white;
                 cursor: pointer;
-                transition: background 0.2s ease;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                transition: background-color 0.3s ease;
             }
 
             button:hover {
@@ -134,460 +188,278 @@ class AuroraEffectSelector extends LitElement {
                 background: var(--secondary-color);
             }
 
-            .blend-controls {
-                display: flex;
-                align-items: center;
-                gap: 16px;
-                margin-top: 16px;
-                padding: 16px;
-                background: var(--primary-background-color, #f5f5f5);
-                border-radius: 8px;
+            .loading {
+                opacity: 0.7;
+                pointer-events: none;
             }
 
-            .genre-mode {
-                margin-top: 16px;
-                padding: 16px;
-                background: var(--primary-background-color, #f5f5f5);
-                border-radius: 8px;
-            }
-
-            .preset-controls {
-                margin-top: 16px;
-            }
-
-            .preset-list {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 8px;
-                margin-top: 8px;
-            }
-
-            .preset-item {
-                padding: 4px 12px;
-                border-radius: 16px;
-                background: var(--primary-color);
-                color: white;
-                font-size: 0.9em;
-                cursor: pointer;
+            .material-symbols-rounded {
+                font-size: 20px;
             }
 
             .error-message {
-                color: var(--error-color);
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 16px;
+                background: var(--error-color);
+                color: white;
+                border-radius: 4px;
+                margin-bottom: 16px;
+            }
+
+            .connection-status {
+                display: flex;
+                align-items: center;
+                gap: 4px;
                 font-size: 0.9em;
-                margin-top: 8px;
+                margin-bottom: 8px;
+                padding: 4px 8px;
+                border-radius: 4px;
+            }
+
+            .connection-status.connected {
+                color: var(--success-color);
+            }
+
+            .connection-status.disconnected {
+                color: var(--error-color);
             }
         `;
     }
 
-    constructor() {
-        super();
-        this.effects = [];
-        this.selectedEffect = null;
-        this.presets = [];
-        this.blendMode = 'mix';
-        this.transitionTime = 1.0;
-        this.isPreviewActive = false;
-        this.genreMode = false;
-        this.currentGenre = '';
-
-        // Internal properties
-        this._previewTimer = null;
-        this._originalParameters = null;
+    async firstUpdated() {
+        if (this.hass) {
+            try {
+                await this._initializeConnection();
+                await this._fetchEffects();
+                await this._fetchPresets();
+            } catch (error) {
+                console.error('Failed to initialize effect selector:', error);
+                this._connectionError = error.message;
+                this._connectionStatus = 'error';
+            }
+        }
     }
 
-    firstUpdated() {
-        this._loadEffects();
-        this._loadPresets();
+    updated(changedProps) {
+        if (changedProps.has('hass') && this.hass) {
+            this._fetchEffects();
+            this._fetchPresets();
+        }
+    }
+
+    async _fetchEffects() {
+        try {
+            const response = await this.hass.callWS({
+                type: 'aurora_sound_to_light/get_effects'
+            });
+            this._effects = response.effects || [];
+        } catch (error) {
+            console.error('Failed to fetch effects:', error);
+        }
+    }
+
+    async _fetchPresets() {
+        try {
+            const response = await this.hass.callWS({
+                type: 'aurora_sound_to_light/get_presets'
+            });
+            this._presets = response.presets || [];
+        } catch (error) {
+            console.error('Failed to fetch presets:', error);
+        }
+    }
+
+    async _handleEffectSelect(effect) {
+        this._loading = true;
+        try {
+            await this.hass.callService('aurora_sound_to_light', 'set_effect', {
+                effect: effect.id,
+                config: effect.config
+            });
+            this._selectedEffect = effect;
+        } catch (error) {
+            console.error('Failed to set effect:', error);
+        } finally {
+            this._loading = false;
+        }
+    }
+
+    async _handleConfigChange(e, key) {
+        if (!this._selectedEffect) return;
+
+        const value = e.target.type === 'range' ? parseFloat(e.target.value) : e.target.value;
+        const newConfig = {
+            ...this._selectedEffect.config,
+            [key]: value
+        };
+
+        try {
+            await this.hass.callService('aurora_sound_to_light', 'update_effect_config', {
+                effect: this._selectedEffect.id,
+                config: newConfig
+            });
+            this._selectedEffect = {
+                ...this._selectedEffect,
+                config: newConfig
+            };
+        } catch (error) {
+            console.error('Failed to update effect config:', error);
+        }
+    }
+
+    async _handlePresetSelect(preset) {
+        this._loading = true;
+        try {
+            await this.hass.callService('aurora_sound_to_light', 'load_preset', {
+                preset: preset.id
+            });
+            this._selectedEffect = preset.effect;
+        } catch (error) {
+            console.error('Failed to load preset:', error);
+        } finally {
+            this._loading = false;
+        }
+    }
+
+    async _handleSavePreset() {
+        if (!this._selectedEffect) return;
+
+        const name = prompt('Enter preset name:');
+        if (!name) return;
+
+        try {
+            await this.hass.callService('aurora_sound_to_light', 'save_preset', {
+                name,
+                effect: this._selectedEffect.id,
+                config: this._selectedEffect.config
+            });
+            await this._fetchPresets();
+        } catch (error) {
+            console.error('Failed to save preset:', error);
+        }
+    }
+
+    async _handleDeletePreset(preset) {
+        if (!confirm(`Delete preset "${preset.name}"?`)) return;
+
+        try {
+            await this.hass.callService('aurora_sound_to_light', 'delete_preset', {
+                preset: preset.id
+            });
+            await this._fetchPresets();
+        } catch (error) {
+            console.error('Failed to delete preset:', error);
+        }
+    }
+
+    async _initializeConnection() {
+        try {
+            await this.hass.callWS({
+                type: 'aurora_sound_to_light/ping'
+            });
+            this._connectionStatus = 'connected';
+            this._connectionError = null;
+        } catch (error) {
+            this._connectionStatus = 'error';
+            this._connectionError = 'Failed to connect to Aurora service';
+            throw error;
+        }
     }
 
     render() {
+        if (!this.hass) return html`<div>Loading...</div>`;
+
+        if (this._connectionError) {
+            return html`
+                <div class="error-message">
+                    <span class="material-symbols-rounded">error</span>
+                    ${this._connectionError}
+                </div>
+            `;
+        }
+
         return html`
-            <div class="effect-selector">
-                <div class="effect-grid">
-                    ${this.effects.map(effect => this._renderEffectCard(effect))}
+            <div class="effect-container ${this._loading ? 'loading' : ''}">
+                ${this._connectionStatus === 'connected' ? html`
+                    <div class="connection-status connected">
+                        <span class="material-symbols-rounded">check_circle</span>
+                        Connected
+                    </div>
+                ` : html`
+                    <div class="connection-status disconnected">
+                        <span class="material-symbols-rounded">error</span>
+                        Disconnected
+                    </div>
+                `}
+                <div class="effect-list">
+                    ${this._effects.map(effect => html`
+                        <div class="effect-card ${this._selectedEffect?.id === effect.id ? 'selected' : ''}"
+                             @click=${() => this._handleEffectSelect(effect)}>
+                            <span class="material-symbols-rounded effect-icon">
+                                ${effect.icon || 'auto_fix'}
+                            </span>
+                            <span class="effect-name">${effect.name}</span>
+                        </div>
+                    `)}
                 </div>
 
-                ${this.selectedEffect ? html`
-                    <div class="parameters-panel">
-                        <h3>Effect Parameters</h3>
-                        ${this._renderParameters()}
-                        
-                        <div class="controls">
-                            <button @click=${this._handlePreview}>
-                                ${this.isPreviewActive ? 'Stop Preview' : 'Preview'}
-                            </button>
-                            <button @click=${this._handleApply}>
-                                Apply
-                            </button>
-                            <button class="secondary" @click=${this._handleSavePreset}>
-                                Save Preset
+                ${this._selectedEffect ? html`
+                    <div class="config-panel">
+                        <div class="config-title">
+                            <span>${this._selectedEffect.name} Configuration</span>
+                            <button @click=${this._handleSavePreset}>
+                                <span class="material-symbols-rounded">save</span>
+                                Save as Preset
                             </button>
                         </div>
-                    </div>
-
-                    <div class="blend-controls">
-                        <div class="parameter-row">
-                            <div class="parameter-label">Blend Mode</div>
-                            <select 
-                                class="parameter-control"
-                                .value=${this.blendMode}
-                                @change=${this._handleBlendModeChange}
-                            >
-                                <option value="mix">Mix</option>
-                                <option value="add">Add</option>
-                                <option value="subtract">Subtract</option>
-                                <option value="multiply">Multiply</option>
-                            </select>
-                        </div>
-
-                        <div class="parameter-row">
-                            <div class="parameter-label">Transition Time</div>
-                            <input 
-                                type="range"
-                                min="0"
-                                max="5"
-                                step="0.1"
-                                .value=${this.transitionTime}
-                                @input=${this._handleTransitionTimeChange}
-                            >
-                            <span>${this.transitionTime}s</span>
+                        <div class="config-grid">
+                            ${Object.entries(this._selectedEffect.config).map(([key, value]) => html`
+                                <div class="config-item">
+                                    <label>${key}</label>
+                                    ${typeof value === 'number' ? html`
+                                        <input type="range"
+                                            min="0"
+                                            max="100"
+                                            step="1"
+                                            .value=${value}
+                                            @input=${(e) => this._handleConfigChange(e, key)}
+                                        />
+                                    ` : html`
+                                        <input type="text"
+                                            .value=${value}
+                                            @change=${(e) => this._handleConfigChange(e, key)}
+                                        />
+                                    `}
+                                </div>
+                            `)}
                         </div>
                     </div>
                 ` : ''}
 
-                <div class="genre-mode">
-                    <div class="parameter-row">
-                        <div class="parameter-label">Genre-based Mode</div>
-                        <input 
-                            type="checkbox"
-                            .checked=${this.genreMode}
-                            @change=${this._handleGenreModeChange}
-                        >
+                <div class="preset-section">
+                    <div class="config-title">
+                        <span>Presets</span>
                     </div>
-                    ${this.genreMode ? html`
-                        <div class="parameter-row">
-                            <div class="parameter-label">Current Genre</div>
-                            <select 
-                                class="parameter-control"
-                                .value=${this.currentGenre}
-                                @change=${this._handleGenreChange}
-                            >
-                                <option value="">Auto Detect</option>
-                                <option value="rock">Rock</option>
-                                <option value="electronic">Electronic</option>
-                                <option value="classical">Classical</option>
-                                <option value="jazz">Jazz</option>
-                                <option value="pop">Pop</option>
-                            </select>
-                        </div>
-                    ` : ''}
-                </div>
-
-                <div class="preset-controls">
-                    <h3>Presets</h3>
                     <div class="preset-list">
-                        ${this.presets.map(preset => html`
-                            <div 
-                                class="preset-item"
-                                @click=${() => this._loadPreset(preset)}
-                            >
+                        ${this._presets.map(preset => html`
+                            <div class="preset-chip" @click=${() => this._handlePresetSelect(preset)}>
+                                <span class="material-symbols-rounded">bookmark</span>
                                 ${preset.name}
+                                <span class="material-symbols-rounded"
+                                      @click=${(e) => {
+                e.stopPropagation();
+                this._handleDeletePreset(preset);
+            }}>
+                                    close
+                                </span>
                             </div>
                         `)}
                     </div>
                 </div>
             </div>
         `;
-    }
-
-    _renderEffectCard(effect) {
-        const isSelected = this.selectedEffect && this.selectedEffect.id === effect.id;
-        return html`
-            <div 
-                class="effect-card ${isSelected ? 'selected' : ''}"
-                @click=${() => this._selectEffect(effect)}
-            >
-                <div class="preview" style=${this._generatePreviewStyle(effect)}></div>
-                <div class="effect-name">${effect.name}</div>
-                <div class="effect-description">${effect.description}</div>
-            </div>
-        `;
-    }
-
-    _renderParameters() {
-        if (!this.selectedEffect) return '';
-
-        return html`
-            ${Object.entries(this.selectedEffect.parameters).map(([key, param]) => html`
-                <div class="parameter-row">
-                    <div class="parameter-label">${param.name}</div>
-                    <div class="parameter-control">
-                        ${this._renderParameterControl(key, param)}
-                    </div>
-                </div>
-            `)}
-        `;
-    }
-
-    _renderParameterControl(key, param) {
-        switch (param.type) {
-            case 'range':
-                return html`
-                    <input 
-                        type="range"
-                        min=${param.min}
-                        max=${param.max}
-                        step=${param.step || 1}
-                        .value=${param.value}
-                        @input=${(e) => this._updateParameter(key, e.target.value)}
-                    >
-                    <span>${param.value}${param.unit || ''}</span>
-                `;
-            case 'color':
-                return html`
-                    <input 
-                        type="color"
-                        .value=${param.value}
-                        @input=${(e) => this._updateParameter(key, e.target.value)}
-                    >
-                `;
-            case 'select':
-                return html`
-                    <select 
-                        .value=${param.value}
-                        @change=${(e) => this._updateParameter(key, e.target.value)}
-                    >
-                        ${param.options.map(opt => html`
-                            <option value=${opt.value}>${opt.label}</option>
-                        `)}
-                    </select>
-                `;
-            default:
-                return html`
-                    <input 
-                        type="text"
-                        .value=${param.value}
-                        @input=${(e) => this._updateParameter(key, e.target.value)}
-                    >
-                `;
-        }
-    }
-
-    _generatePreviewStyle(effect) {
-        // Generate CSS gradient or animation based on effect type
-        return `background: linear-gradient(45deg, ${effect.colors.join(', ')});`;
-    }
-
-    async _loadEffects() {
-        try {
-            const response = await this.hass.callWS({
-                type: 'aurora_sound_to_light/get_effects'
-            });
-            this.effects = response.effects.map(effect => ({
-                ...effect,
-                parameters: this._initializeParameters(effect.parameters)
-            }));
-        } catch (error) {
-            console.error('Failed to load effects:', error);
-        }
-    }
-
-    _initializeParameters(parameters) {
-        const initialized = {};
-        for (const [key, param] of Object.entries(parameters)) {
-            initialized[key] = {
-                ...param,
-                value: param.default
-            };
-        }
-        return initialized;
-    }
-
-    async _loadPresets() {
-        try {
-            const response = await this.hass.callWS({
-                type: 'aurora_sound_to_light/get_presets'
-            });
-            this.presets = response.presets;
-        } catch (error) {
-            console.error('Failed to load presets:', error);
-        }
-    }
-
-    _selectEffect(effect) {
-        this.selectedEffect = effect;
-        this._originalParameters = JSON.parse(JSON.stringify(effect.parameters));
-        this._dispatchEffectChange();
-    }
-
-    _updateParameter(key, value) {
-        if (!this.selectedEffect) return;
-
-        this.selectedEffect = {
-            ...this.selectedEffect,
-            parameters: {
-                ...this.selectedEffect.parameters,
-                [key]: {
-                    ...this.selectedEffect.parameters[key],
-                    value
-                }
-            }
-        };
-
-        if (this.isPreviewActive) {
-            this._updatePreview();
-        }
-    }
-
-    _handleBlendModeChange(e) {
-        this.blendMode = e.target.value;
-        this._dispatchEffectChange();
-    }
-
-    _handleTransitionTimeChange(e) {
-        this.transitionTime = parseFloat(e.target.value);
-        this._dispatchEffectChange();
-    }
-
-    _handleGenreModeChange(e) {
-        this.genreMode = e.target.checked;
-        this._dispatchEffectChange();
-    }
-
-    _handleGenreChange(e) {
-        this.currentGenre = e.target.value;
-        this._dispatchEffectChange();
-    }
-
-    _handlePreview() {
-        this.isPreviewActive = !this.isPreviewActive;
-        if (this.isPreviewActive) {
-            this._startPreview();
-        } else {
-            this._stopPreview();
-        }
-    }
-
-    async _handleApply() {
-        try {
-            await this.hass.callWS({
-                type: 'aurora_sound_to_light/apply_effect',
-                effect_id: this.selectedEffect.id,
-                parameters: this._getParameterValues(),
-                blend_mode: this.blendMode,
-                transition_time: this.transitionTime
-            });
-        } catch (error) {
-            console.error('Failed to apply effect:', error);
-        }
-    }
-
-    async _handleSavePreset() {
-        const name = prompt('Enter preset name:');
-        if (!name) return;
-
-        try {
-            await this.hass.callWS({
-                type: 'aurora_sound_to_light/save_preset',
-                name,
-                effect_id: this.selectedEffect.id,
-                parameters: this._getParameterValues(),
-                blend_mode: this.blendMode,
-                transition_time: this.transitionTime
-            });
-            await this._loadPresets();
-        } catch (error) {
-            console.error('Failed to save preset:', error);
-        }
-    }
-
-    async _loadPreset(preset) {
-        try {
-            const effect = this.effects.find(e => e.id === preset.effect_id);
-            if (!effect) return;
-
-            this.selectedEffect = {
-                ...effect,
-                parameters: this._applyPresetParameters(effect.parameters, preset.parameters)
-            };
-            this.blendMode = preset.blend_mode;
-            this.transitionTime = preset.transition_time;
-
-            this._dispatchEffectChange();
-        } catch (error) {
-            console.error('Failed to load preset:', error);
-        }
-    }
-
-    _applyPresetParameters(baseParameters, presetParameters) {
-        const applied = {};
-        for (const [key, param] of Object.entries(baseParameters)) {
-            applied[key] = {
-                ...param,
-                value: presetParameters[key] || param.default
-            };
-        }
-        return applied;
-    }
-
-    _getParameterValues() {
-        const values = {};
-        for (const [key, param] of Object.entries(this.selectedEffect.parameters)) {
-            values[key] = param.value;
-        }
-        return values;
-    }
-
-    _startPreview() {
-        this._updatePreview();
-        this._previewTimer = setInterval(() => this._updatePreview(), 1000);
-    }
-
-    _stopPreview() {
-        if (this._previewTimer) {
-            clearInterval(this._previewTimer);
-            this._previewTimer = null;
-        }
-        // Restore original parameters
-        if (this._originalParameters) {
-            this.selectedEffect = {
-                ...this.selectedEffect,
-                parameters: JSON.parse(JSON.stringify(this._originalParameters))
-            };
-        }
-    }
-
-    async _updatePreview() {
-        try {
-            await this.hass.callWS({
-                type: 'aurora_sound_to_light/preview_effect',
-                effect_id: this.selectedEffect.id,
-                parameters: this._getParameterValues()
-            });
-        } catch (error) {
-            console.error('Failed to update preview:', error);
-        }
-    }
-
-    _dispatchEffectChange() {
-        const event = new CustomEvent('aurora-effect-change', {
-            detail: {
-                effect: this.selectedEffect,
-                parameters: this._getParameterValues(),
-                blendMode: this.blendMode,
-                transitionTime: this.transitionTime,
-                genreMode: this.genreMode,
-                currentGenre: this.currentGenre
-            },
-            bubbles: true,
-            composed: true
-        });
-        this.dispatchEvent(event);
-    }
-
-    disconnectedCallback() {
-        super.disconnectedCallback();
-        this._stopPreview();
     }
 }
 
