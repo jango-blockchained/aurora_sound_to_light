@@ -64,6 +64,14 @@ node_modules
 
 # Python cache files
 __pycache__/
+# Ignore __pycache__ directories with a depth of 2 to 5
+**/__pycache__
+**/**/__pycache__/
+**/**/**/__pycache__/
+**/**/**/**/__pycache__/
+**/**/**/**/**/__pycache__/
+
+
 *.py[cod]
 *$py.class
 
@@ -99,3 +107,4 @@ ENV/
 *.db
 
 tasks
+effects/__pycache__/__init__.cpython-312.pyc
