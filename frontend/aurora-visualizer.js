@@ -2,7 +2,7 @@ import {
     LitElement,
     html,
     css,
-} from "https://unpkg.com/lit-element@2.4.0/lit-element.js?module";
+} from "https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";
 
 class AuroraVisualizer extends LitElement {
     static get properties() {
