@@ -20,6 +20,36 @@ tests/
 
 ## Test Categories
 
+### Overview
+The Aurora Sound to Light test suite provides comprehensive coverage of all system components:
+
+#### Core Components Tested
+- **Effect Engines**: Unit tests for various light effect implementations
+  - Beat detection algorithms
+  - Color pattern generation
+  - Effect chain processing
+- **Audio Processing**: Tests for audio input handling and processing
+  - FFT analysis
+  - Buffer management
+  - Input source handling
+- **Light Control**: Verification of light control commands and state management
+  - Protocol support
+  - State transitions
+  - Latency optimization
+- **Frontend Components**: Tests for core UI elements
+  - `AuroraDashboard`: Layout and component integration
+  - `AuroraMediaControls`: Playback and source control
+  - `AuroraVisualizer`: Audio visualization modes
+  - `AuroraPerformanceMonitor`: System metrics and alerts
+- **System Integration**: Tests for Home Assistant integration
+  - WebSocket communication
+  - Service calls
+  - State synchronization
+- **Performance Monitoring**: System health tracking
+  - Metric collection
+  - Alert thresholds
+  - Resource utilization
+
 ### Frontend Tests
 
 1. **Unit Tests** (`frontend/unit/`)
@@ -54,13 +84,20 @@ tests/
 ### Frontend Tests
 
 ```bash
-# Run all frontend tests
+# Run all tests
 npm test
 
-# Run specific test categories
-npm run test:unit
-npm run test:integration
-npm run test:e2e
+# Run all frontend tests
+npm run test:frontend
+
+# Run unit tests only
+npm run test:frontend:unit
+
+# Run integration tests only
+npm run test:frontend:integration
+
+# Run end-to-end tests only
+npm run test:frontend:e2e
 
 # Run tests with coverage
 npm run test:coverage
@@ -143,6 +180,31 @@ pytest --cov=custom_components/aurora_sound_to_light
   - Functions: 80%
   - Lines: 80%
 
+## Test Scenarios
+
+### Performance Monitor Test Suite
+The performance monitoring system includes specific test scenarios:
+
+1. **Normal Operation**
+   - Validates baseline metrics
+   - Verifies alert thresholds
+   - Monitors system stability
+
+2. **High CPU Load**
+   - Tests system behavior under heavy load
+   - Validates alert generation
+   - Monitors resource management
+
+3. **Network Issues**
+   - Simulates connectivity problems
+   - Tests buffer health monitoring
+   - Validates latency alerts
+
+4. **Critical System Load**
+   - Tests extreme resource utilization
+   - Validates multiple alert conditions
+   - Monitors system recovery
+
 ## Best Practices
 
 1. **Test Independence**
@@ -178,4 +240,4 @@ When adding new features or modifying existing ones:
 2. Ensure all tests pass locally before pushing
 3. Maintain or improve code coverage
 4. Follow existing naming conventions and patterns
-5. Update test documentation as needed 
+5. Update test documentation as needed

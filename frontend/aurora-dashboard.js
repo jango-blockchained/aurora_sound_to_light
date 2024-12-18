@@ -20,359 +20,77 @@ class AuroraDashboard extends LitElement {
     static get properties() {
         return {
             hass: { type: Object },
-            _state: { type: Object, state: true },
+            narrow: { type: Boolean },
+            panel: { type: Object },
+            route: { type: Object },
             _config: { type: Object, state: true },
+            _error: { type: String, state: true },
             _connected: { type: Boolean, state: true },
-            _error: { type: String, state: true }
+            _systemCapabilities: { type: Object, state: true }
         };
     }
 
     constructor() {
         super();
-        this._initializeState();
-        this._bindEventHandlers();
-    }
-
-    _initializeState() {
-        // Initialize state with default values
-        this._state = {
-            audioState: {
-                isPlaying: false,
-                volume: 50,
-                inputSource: 'default'
-            },
-            effectState: {
-                currentEffect: null,
-                effectSettings: {}
-            },
-            groupState: {
-                activeGroups: [],
-                groupSettings: {}
-            }
-        };
-        this._config = null;
+        this._config = {};
+        this._error = null;
         this._connected = false;
-        this._error = null;
-
-        // Try to load persisted state
-        const savedState = this._loadPersistedState();
-        if (savedState) {
-            this._state = { ...this._state, ...savedState };
-        }
+        this._systemCapabilities = {
+            hasAudio: false,
+            hasMediaPlayer: false,
+            hasSpotify: false
+        };
     }
 
-    _bindEventHandlers() {
-        // Bind event handlers
-        this._handleServiceCall = this._handleServiceCall.bind(this);
-        this._handleResize = this._handleResize.bind(this);
-        this._handleVisibilityChange = this._handleVisibilityChange.bind(this);
-        this._handleAudioUpdate = this._handleAudioUpdate.bind(this);
-        this._handleMediaControl = this._handleMediaControl.bind(this);
-        this._handleEffectChange = this._handleEffectChange.bind(this);
-        this._handleGroupUpdate = this._handleGroupUpdate.bind(this);
-        this._dismissError = this._dismissError.bind(this);
-    }
-
-    async _handleServiceCall(service, data = {}) {
-        if (!this.hass) {
-            throw new Error('Home Assistant connection not available');
-        }
+    async firstUpdated() {
         try {
-            await this.hass.callService('aurora_sound_to_light', service, data);
-        } catch (error) {
-            this._handleError(`Failed to call service ${service}`, error);
-            throw error;
-        }
-    }
-
-    _handleResize() {
-        // Handle window resize events
-        this.requestUpdate();
-    }
-
-    _handleVisibilityChange() {
-        // Handle visibility change events
-        if (document.hidden) {
-            // Pause or cleanup when tab is hidden
-            this._pauseAudio();
-        }
-    }
-
-    _handleAudioUpdate(event) {
-        // Handle audio update events
-        const { detail } = event;
-        this._updateState('audioState', detail);
-    }
-
-    _handleMediaControl(event) {
-        // Handle media control events
-        const { detail } = event;
-        if (detail.action === 'play') {
-            this._startAudio();
-        } else if (detail.action === 'pause') {
-            this._pauseAudio();
-        } else if (detail.action === 'volume') {
-            this._updateVolume(detail.value);
-        } else if (detail.action === 'source') {
-            this._changeAudioSource(detail.value);
-        }
-    }
-
-    _handleEffectChange(event) {
-        // Handle effect change events
-        const { detail } = event;
-        this._updateState('effectState', detail);
-    }
-
-    _handleGroupUpdate(event) {
-        // Handle group update events
-        const { detail } = event;
-        this._updateState('groupState', detail);
-    }
-
-    // State Management Methods
-    _loadPersistedState() {
-        try {
-            const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-            return saved ? JSON.parse(saved) : null;
-        } catch (e) {
-            console.error('Failed to load persisted state:', e);
-            return null;
-        }
-    }
-
-    _persistState() {
-        try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(this._state));
-        } catch (e) {
-            console.error('Failed to persist state:', e);
-        }
-    }
-
-    _updateState(path, value) {
-        if (typeof value === 'object') {
-            this._state = {
-                ...this._state,
-                [path]: {
-                    ...this._state[path],
-                    ...value
-                }
-            };
-        } else {
-            this._state = {
-                ...this._state,
-                [path]: value
-            };
-        }
-        this.requestUpdate('_state');
-    }
-
-    // Error Handling Methods
-    _handleError(message, error = null) {
-        this._error = message;
-        if (error) {
-            console.error(message, error);
-        }
-    }
-
-    _dismissError() {
-        this._error = null;
-    }
-
-    // WebSocket Methods
-    async _initializeWebSocket() {
-        if (!this.hass) {
-            throw new Error('Home Assistant connection not available');
-        }
-
-        try {
-            await Promise.all([
-                this.hass.callWS({ type: WEBSOCKET_TYPES.SUBSCRIBE_METRICS }),
-                this.hass.callWS({ type: WEBSOCKET_TYPES.SUBSCRIBE_STATE })
-            ]);
-
-            this._setupWebSocketSubscriptions();
-            this._connected = true;
-        } catch (error) {
-            this._handleError('Failed to initialize WebSocket', error);
-            throw error;
-        }
-    }
-
-    _setupWebSocketSubscriptions() {
-        this.hass.connection.subscribeMessage(
-            (message) => this._handleStateUpdate(message),
-            { type: WEBSOCKET_TYPES.STATE }
-        );
-
-        this.hass.connection.subscribeMessage(
-            (message) => this._handleMetricsUpdate(message),
-            { type: WEBSOCKET_TYPES.METRICS }
-        );
-    }
-
-    // Audio Control Methods
-    async _startAudio() {
-        try {
-            await this.hass.callService('aurora_sound_to_light', 'start_audio', {
-                source: this._state.audioState.inputSource
+            // Get panel configuration
+            const result = await this.hass.callWS({
+                type: 'aurora_sound_to_light/get_panel_config'
             });
-            this._updateState('audioState', { isPlaying: true });
-        } catch (e) {
-            this._handleError('Failed to start audio', e);
+
+            this._config = result;
+            this._systemCapabilities = {
+                hasAudio: result.system_info?.has_audio || false,
+                hasMediaPlayer: result.system_info?.has_media_player || false,
+                hasSpotify: result.system_info?.has_spotify || false
+            };
+            this._connected = true;
+        } catch (err) {
+            this._error = `Failed to load panel configuration: ${err.message}`;
+            console.error('Failed to load panel configuration:', err);
         }
     }
 
-    async _pauseAudio() {
+    async _updatePanelConfig(config) {
         try {
-            await this.hass.callService('aurora_sound_to_light', 'stop_audio', {});
-            this._updateState('audioState', { isPlaying: false });
-        } catch (e) {
-            this._handleError('Failed to stop audio', e);
+            await this.hass.callWS({
+                type: 'aurora_sound_to_light/update_panel_config',
+                config
+            });
+            this._config = { ...this._config, ...config };
+        } catch (err) {
+            this._error = `Failed to update panel configuration: ${err.message}`;
+            console.error('Failed to update panel configuration:', err);
         }
-    }
-
-    async _updateVolume(volume) {
-        try {
-            await this.hass.callService('aurora_sound_to_light', 'set_volume', { volume });
-            this._updateState('audioState', { volume });
-        } catch (e) {
-            this._handleError('Failed to update volume', e);
-        }
-    }
-
-    async _changeAudioSource(source) {
-        try {
-            await this.hass.callService('aurora_sound_to_light', 'set_audio_source', { source });
-            this._updateState('audioState', { inputSource: source });
-        } catch (e) {
-            this._handleError('Failed to change audio source', e);
-        }
-    }
-
-    static get styles() {
-        return css`
-            :host {
-                display: block;
-                padding: 16px;
-            }
-
-            .dashboard-container {
-                display: grid;
-                gap: 16px;
-            }
-
-            .dashboard-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 16px;
-            }
-
-            .dashboard-title {
-                font-size: 1.5em;
-                font-weight: 500;
-                color: var(--primary-text-color);
-            }
-
-            .dashboard-status {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .dashboard-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                gap: 16px;
-            }
-
-            .dashboard-card {
-                background: var(--card-background-color, #fff);
-                border-radius: var(--ha-card-border-radius, 4px);
-                box-shadow: var(--ha-card-box-shadow, 0 2px 2px rgba(0, 0, 0, 0.1));
-                overflow: hidden;
-            }
-
-            .card-header {
-                padding: 16px;
-                border-bottom: 1px solid var(--divider-color);
-                font-weight: 500;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-
-            .card-content {
-                padding: 16px;
-            }
-
-            .metrics-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 16px;
-            }
-
-            .metric-item {
-                text-align: center;
-                padding: 8px;
-            }
-
-            .metric-value {
-                font-size: 1.5em;
-                font-weight: 500;
-                color: var(--primary-color);
-            }
-
-            .metric-label {
-                font-size: 0.9em;
-                color: var(--secondary-text-color);
-            }
-
-            .error-message {
-                background: var(--error-color);
-                color: white;
-                padding: 16px;
-                border-radius: 4px;
-                margin-bottom: 16px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .connection-status {
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-size: 0.9em;
-                display: flex;
-                align-items: center;
-                gap: 4px;
-            }
-
-            .connection-status.connected {
-                color: var(--success-color);
-            }
-
-            .connection-status.disconnected {
-                color: var(--error-color);
-            }
-
-            @media (max-width: ${BREAKPOINT_MOBILE}px) {
-                .dashboard-grid {
-                    grid-template-columns: 1fr;
-                }
-            }
-        `;
     }
 
     render() {
-        if (!this.hass) return html`<div>Loading...</div>`;
+        if (!this.hass) {
+            return html`<div>Loading...</div>`;
+        }
 
         if (this._error) {
             return html`
-                <div class="error-message">
-                    <span class="material-symbols-rounded">error</span>
-                    ${this._error}
+                <div class="error-container">
+                    <div class="error-message">
+                        <span class="material-symbols-rounded">error</span>
+                        ${this._error}
+                    </div>
+                    <button @click=${() => this.firstUpdated()}>
+                        <span class="material-symbols-rounded">refresh</span>
+                        Retry
+                    </button>
                 </div>
             `;
         }
@@ -380,7 +98,10 @@ class AuroraDashboard extends LitElement {
         return html`
             <div class="dashboard-container">
                 <div class="dashboard-header">
-                    <div class="dashboard-title">Aurora Sound to Light</div>
+                    <div class="dashboard-title">
+                        <span class="material-symbols-rounded">music_note</span>
+                        Aurora Sound to Light
+                    </div>
                     <div class="dashboard-status">
                         ${this._connected ? html`
                             <div class="connection-status connected">
@@ -397,85 +118,89 @@ class AuroraDashboard extends LitElement {
                 </div>
 
                 <div class="dashboard-grid">
-                    <!-- Media Controls Card -->
-                    <div class="dashboard-card">
+                    <!-- Audio Visualizer -->
+                    <div class="dashboard-card visualizer-card">
                         <div class="card-header">
-                            <span>Media Controls</span>
-                        </div>
-                        <div class="card-content">
-                            <aurora-media-controls
-                                .hass=${this.hass}
-                                @audio-update=${this._handleAudioUpdate}
-                                @media-control=${this._handleMediaControl}
-                            ></aurora-media-controls>
-                        </div>
-                    </div>
-
-                    <!-- Visualizer Card -->
-                    <div class="dashboard-card">
-                        <div class="card-header">
+                            <span class="material-symbols-rounded">equalizer</span>
                             <span>Audio Visualization</span>
                         </div>
                         <div class="card-content">
-                            <aurora-visualizer
-                                .hass=${this.hass}
-                                mode="frequency"
-                                ?isActive=${this._state.audioState.isPlaying}
-                            ></aurora-visualizer>
+                            ${this._systemCapabilities.hasAudio ? html`
+                                <aurora-visualizer
+                                    .hass=${this.hass}
+                                    mode="frequency"
+                                    ?isActive=${this._connected}
+                                ></aurora-visualizer>
+                            ` : html`
+                                <div class="feature-unavailable">
+                                    <span class="material-symbols-rounded">mic_off</span>
+                                    <span>Audio input not available</span>
+                                </div>
+                            `}
                         </div>
                     </div>
 
-                    <!-- Effect Selector Card -->
+                    <!-- Media Controls -->
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <span class="material-symbols-rounded">play_circle</span>
+                            <span>Media Controls</span>
+                        </div>
+                        <div class="card-content">
+                            ${this._systemCapabilities.hasMediaPlayer ? html`
+                                <aurora-media-controls
+                                    .hass=${this.hass}
+                                    .config=${this._config}
+                                    ?hasSpotify=${this._systemCapabilities.hasSpotify}
+                                ></aurora-media-controls>
+                            ` : html`
+                                <div class="feature-unavailable">
+                                    <span class="material-symbols-rounded">music_off</span>
+                                    <span>Media player not available</span>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+
+                    <!-- Effect Selector -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <span class="material-symbols-rounded">auto_fix</span>
                             <span>Light Effects</span>
                         </div>
                         <div class="card-content">
                             <aurora-effect-selector
                                 .hass=${this.hass}
-                                @effect-change=${this._handleEffectChange}
+                                .config=${this._config}
                             ></aurora-effect-selector>
                         </div>
                     </div>
 
-                    <!-- Group Manager Card -->
+                    <!-- Light Groups -->
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <span class="material-symbols-rounded">lightbulb</span>
                             <span>Light Groups</span>
                         </div>
                         <div class="card-content">
                             <aurora-group-manager
                                 .hass=${this.hass}
-                                @group-update=${this._handleGroupUpdate}
+                                .config=${this._config}
                             ></aurora-group-manager>
                         </div>
                     </div>
 
-                    <!-- Performance Metrics Card -->
-                    ${this._config?.show_metrics ? html`
+                    <!-- Performance Monitor -->
+                    ${this._config.show_metrics ? html`
                         <div class="dashboard-card">
                             <div class="card-header">
-                                <span>Performance Metrics</span>
+                                <span class="material-symbols-rounded">monitoring</span>
+                                <span>Performance</span>
                             </div>
                             <div class="card-content">
-                                <div class="metrics-grid">
-                                    <div class="metric-item">
-                                        <div class="metric-value">${this._state.metrics?.fps || 0}</div>
-                                        <div class="metric-label">FPS</div>
-                                    </div>
-                                    <div class="metric-item">
-                                        <div class="metric-value">${this._state.metrics?.latency || 0}ms</div>
-                                        <div class="metric-label">Latency</div>
-                                    </div>
-                                    <div class="metric-item">
-                                        <div class="metric-value">${this._state.metrics?.cpu_usage || 0}%</div>
-                                        <div class="metric-label">CPU Usage</div>
-                                    </div>
-                                    <div class="metric-item">
-                                        <div class="metric-value">${this._state.metrics?.memory_usage || 0}MB</div>
-                                        <div class="metric-label">Memory Usage</div>
-                                    </div>
-                                </div>
+                                <aurora-performance-monitor
+                                    .hass=${this.hass}
+                                ></aurora-performance-monitor>
                             </div>
                         </div>
                     ` : ''}
@@ -484,27 +209,158 @@ class AuroraDashboard extends LitElement {
         `;
     }
 
-    // WebSocket Event Handlers
-    _handleStateUpdate(message) {
-        this._updateState({
-            audioState: message.audio_state || this._state.audioState,
-            effectState: message.effect_state || this._state.effectState,
-            groupState: message.group_state || this._state.groupState
-        });
-    }
+    static get styles() {
+        return css`
+            :host {
+                display: block;
+                --primary-color: var(--ha-primary-color, #03a9f4);
+                --secondary-color: var(--ha-accent-color, #ff9800);
+                --text-primary-color: var(--primary-text-color, #212121);
+                --text-secondary-color: var(--secondary-text-color, #727272);
+                --divider-color: var(--divider-color, #bdbdbd);
+                --error-color: var(--error-color, #db4437);
+                --warning-color: var(--warning-color, #ffa600);
+                --success-color: var(--success-color, #43a047);
+                --card-background-color: var(--card-background-color, #ffffff);
+            }
 
-    _handleMetricsUpdate(message) {
-        this._updateState({
-            metrics: message.metrics || {}
-        });
-    }
+            .dashboard-container {
+                padding: 16px;
+                max-width: 1800px;
+                margin: 0 auto;
+            }
 
-    // Cleanup
-    disconnectedCallback() {
-        super.disconnectedCallback();
-        window.removeEventListener('resize', this._handleResize);
-        document.removeEventListener('visibilitychange', this._handleVisibilityChange);
-        this._persistState();
+            .dashboard-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 24px;
+            }
+
+            .dashboard-title {
+                font-size: 24px;
+                font-weight: 500;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .dashboard-status {
+                display: flex;
+                align-items: center;
+            }
+
+            .connection-status {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 14px;
+            }
+
+            .connection-status.connected {
+                background-color: var(--success-color);
+                color: white;
+            }
+
+            .connection-status.disconnected {
+                background-color: var(--error-color);
+                color: white;
+            }
+
+            .dashboard-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 16px;
+            }
+
+            .dashboard-card {
+                background-color: var(--card-background-color);
+                border-radius: 8px;
+                box-shadow: var(--ha-card-box-shadow, 0 2px 2px rgba(0, 0, 0, 0.14));
+                overflow: hidden;
+            }
+
+            .visualizer-card {
+                grid-column: 1 / -1;
+            }
+
+            .card-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 16px;
+                border-bottom: 1px solid var(--divider-color);
+                font-size: 16px;
+                font-weight: 500;
+            }
+
+            .card-content {
+                padding: 16px;
+            }
+
+            .error-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 16px;
+                padding: 32px;
+            }
+
+            .error-message {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: var(--error-color);
+                font-size: 16px;
+            }
+
+            .feature-unavailable {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 8px;
+                padding: 32px;
+                color: var(--text-secondary-color);
+                text-align: center;
+            }
+
+            button {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                background-color: var(--primary-color);
+                color: white;
+                cursor: pointer;
+                font-size: 14px;
+                transition: background-color 0.2s;
+            }
+
+            button:hover {
+                background-color: var(--primary-color);
+                opacity: 0.9;
+            }
+
+            @media (max-width: 768px) {
+                .dashboard-container {
+                    padding: 8px;
+                }
+
+                .dashboard-grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .dashboard-header {
+                    flex-direction: column;
+                    gap: 16px;
+                    text-align: center;
+                }
+            }
+        `;
     }
 }
 
