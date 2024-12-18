@@ -1,5 +1,14 @@
 """Test fixtures for Aurora Sound to Light."""
 import pytest
+import os
+import sys
+from pathlib import Path
+
+# Get the root directory of the project (where custom_components is)
+root_dir = Path(__file__).parent.parent
+
+# Add the root directory to Python path so custom_components can be imported
+sys.path.insert(0, str(root_dir))
 
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
