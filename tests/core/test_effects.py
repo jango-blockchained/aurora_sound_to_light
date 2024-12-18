@@ -2,6 +2,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 import numpy as np
+import asyncio
 
 from homeassistant.core import HomeAssistant
 from homeassistant.components.light import ATTR_BRIGHTNESS, ATTR_RGB_COLOR
@@ -16,7 +17,11 @@ def hass():
     """Home Assistant fixture."""
     mock_hass = MagicMock(spec=HomeAssistant)
     mock_hass.services = MagicMock()
-    mock_hass.services.call = MagicMock(return_value=None)
+    
+    async def async_call(*args, **kwargs):
+        return None
+    
+    mock_hass.services.call = MagicMock(side_effect=async_call)
     mock_hass.states = MagicMock()
     return mock_hass
 
@@ -43,7 +48,13 @@ class TestBassPulseEffect:
     async def test_update_with_beat(self, hass):
         """Test update behavior when beat is detected."""
         lights = ["light.test1"]
-        effect = BassPulseEffect(hass, lights)
+        params = {
+            "min_brightness": 50,
+            "max_brightness": 255,
+            "color": [255, 0, 0],
+            "sensitivity": 1.0
+        }
+        effect = BassPulseEffect(hass, lights, params)
         await effect.start()
 
         # Simulate a strong bass frequency
@@ -52,16 +63,26 @@ class TestBassPulseEffect:
         
         await effect.update(audio_data.tolist(), True, 120)
 
-        # Verify light service was called with max brightness
+        # Calculate expected brightness
+        bass_energy = 0.8  # Mean of the first 10 values
+        expected_brightness = int(50 + (255 - 50) * min(1.0, bass_energy * 1.0))
+
+        # Verify light service was called with calculated brightness
         hass.services.call.assert_called_with(
             "light", "turn_on",
-            {"entity_id": lights[0], "brightness": 255, "rgb_color": [255, 0, 0]}
+            {"entity_id": lights[0], "brightness": expected_brightness, "rgb_color": [255, 0, 0]}
         )
 
     async def test_update_without_beat(self, hass):
         """Test update behavior when no beat is detected."""
         lights = ["light.test1"]
-        effect = BassPulseEffect(hass, lights)
+        params = {
+            "min_brightness": 50,
+            "max_brightness": 255,
+            "color": [255, 0, 0],
+            "sensitivity": 1.0
+        }
+        effect = BassPulseEffect(hass, lights, params)
         await effect.start()
 
         # Simulate weak bass frequencies
@@ -70,10 +91,14 @@ class TestBassPulseEffect:
         
         await effect.update(audio_data.tolist(), False, 120)
 
-        # Verify light service was called with min brightness
+        # Calculate expected brightness
+        bass_energy = 0.1  # Mean of the first 10 values
+        expected_brightness = int(50 + (255 - 50) * min(1.0, bass_energy * 1.0))
+
+        # Verify light service was called with calculated brightness
         hass.services.call.assert_called_with(
             "light", "turn_on",
-            {"entity_id": lights[0], "brightness": 50, "rgb_color": [255, 0, 0]}
+            {"entity_id": lights[0], "brightness": expected_brightness, "rgb_color": [255, 0, 0]}
         )
 
 

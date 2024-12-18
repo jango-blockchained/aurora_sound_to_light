@@ -2,6 +2,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from typing import List, Optional
+import asyncio
 
 from homeassistant.core import HomeAssistant
 
@@ -45,7 +46,11 @@ def hass():
     """Home Assistant fixture."""
     mock_hass = MagicMock(spec=HomeAssistant)
     mock_hass.services = MagicMock()
-    mock_hass.services.call = MagicMock(return_value=None)
+    
+    async def async_call(*args, **kwargs):
+        return None
+    
+    mock_hass.services.call = MagicMock(side_effect=async_call)
     return mock_hass
 
 
