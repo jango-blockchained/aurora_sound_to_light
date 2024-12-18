@@ -1,158 +1,78 @@
-create_effect:
-  name: Create Effect
-  description: Create a new custom light effect
+# Service definitions for Aurora Sound to Light
+
+security_audit:
+  name: Security Audit
+  description: Perform a security audit and return findings about the system's security status.
+
+reset_rate_limits:
+  name: Reset Rate Limits
+  description: Reset rate limiting counters for a specific client or all clients.
   fields:
-    name:
-      name: Name
-      description: Name of the custom effect
-      required: true
-      example: "My Custom Effect"
-      selector:
-        text:
-    code:
-      name: Code
-      description: Python code for the effect. Must set 'result' list with light states.
-      required: true
-      example: |
-        # Example: Simple color wave effect
-        for i in range(num_lights):
-            hue = (i / num_lights + parameters['phase']) % 1.0
-            rgb = tuple(int(x * 255) for x in colorsys.hsv_to_rgb(hue, 1.0, 1.0))
-            result.append({
-                'rgb_color': rgb,
-                'brightness': 255
-            })
-      selector:
-        text:
-          multiline: true
-    parameters:
-      name: Parameters
-      description: Effect parameters schema in JSON format
-      required: true
-      example: |
-        {
-          "phase": {
-            "type": "number",
-            "name": "Phase Offset",
-            "min": 0,
-            "max": 1,
-            "step": 0.1,
-            "default": 0
-          }
-        }
-      selector:
-        object:
-    description:
-      name: Description
-      description: Description of what the effect does
+    client_id:
+      name: Client ID
+      description: The ID of the client to reset. If not provided, resets all clients.
       required: false
-      example: "Creates a smooth wave of colors across all lights"
+      example: "192.168.1.100"
       selector:
         text:
 
-update_effect:
-  name: Update Effect
-  description: Update an existing custom effect
+unban_client:
+  name: Unban Client
+  description: Manually unban a client that has been temporarily banned due to excessive failed attempts.
   fields:
-    effect_id:
-      name: Effect ID
-      description: ID of the effect to update
+    client_id:
+      name: Client ID
+      description: The ID of the client to unban.
       required: true
+      example: "192.168.1.100"
       selector:
         text:
-    code:
-      name: Code
-      description: New Python code for the effect
+
+get_audit_log:
+  name: Get Audit Log
+  description: Retrieve filtered security audit log entries.
+  fields:
+    start_time:
+      name: Start Time
+      description: Filter entries after this timestamp (ISO format).
       required: false
+      example: "2023-12-18T00:00:00"
       selector:
-        text:
-          multiline: true
-    parameters:
-      name: Parameters
-      description: New effect parameters schema
+        datetime:
+
+    end_time:
+      name: End Time
+      description: Filter entries before this timestamp (ISO format).
       required: false
+      example: "2023-12-18T23:59:59"
       selector:
-        object:
-    description:
-      name: Description
-      description: New effect description
+        datetime:
+
+    client_id:
+      name: Client ID
+      description: Filter entries for a specific client.
       required: false
+      example: "192.168.1.100"
       selector:
         text:
 
-delete_effect:
-  name: Delete Effect
-  description: Delete a custom effect
-  fields:
-    effect_id:
-      name: Effect ID
-      description: ID of the effect to delete
-      required: true
-      selector:
-        text:
-
-list_effects:
-  name: List Effects
-  description: List all available effects (both built-in and custom) 
-
-set_effect:
-  name: Set Effect
-  description: Set the active light effect
-  fields:
-    effect_id:
-      name: Effect ID
-      description: ID of the effect to activate
-      required: true
-      example: "bass_pulse"
-      selector:
-        text:
-
-set_media_player:
-  name: Set Media Player
-  description: Set the media player to use for audio input
-  fields:
-    entity_id:
-      name: Media Player
-      description: The entity ID of the media player to use
-      required: true
-      selector:
-        entity:
-          domain: media_player
-
-update_groups:
-  name: Update Light Groups
-  description: Update the light groups configuration
-  fields:
-    groups:
-      name: Groups
-      description: List of light group configurations
-      required: true
-      example: |
-        [
-          {
-            "id": "living_room",
-            "name": "Living Room",
-            "lights": ["light.living_room_1", "light.living_room_2"]
-          }
-        ]
-      selector:
-        object:
-
-start_audio_capture:
-  name: Start Audio Capture
-  description: Start capturing audio from the selected source
-  fields:
-    source:
-      name: Source
-      description: Audio source to use
-      required: true
-      example: "microphone"
+    request_type:
+      name: Request Type
+      description: Filter entries by request type (e.g., "effect", "light_group", "security").
+      required: false
+      example: "effect"
       selector:
         select:
           options:
-            - "microphone"
-            - "media_player"
+            - "effect"
+            - "light_group"
+            - "security"
 
-stop_audio_capture:
-  name: Stop Audio Capture
-  description: Stop capturing audio
+    success:
+      name: Success
+      description: Filter entries by success status.
+      required: false
+      selector:
+        boolean:
+
+# ... existing services below ... 

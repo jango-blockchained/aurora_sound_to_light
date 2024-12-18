@@ -36,7 +36,7 @@ extend-exclude = """
 profile = "black"
 multi_line_output = 3
 line_length = 88
-known_first_party = ["custom_components.aurora_sound_to_light"]
+known_first_party = ["aurora_sound_to_light"]
 known_third_party = ["homeassistant"]
 
 [tool.pylint.MASTER]

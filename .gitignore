@@ -1,111 +1,88 @@
-# Home Assistant files
-.storage
-.cloud
-.google.token
-.uuid
-.HA_VERSION
-
-# Database
-*.db
-*.db-shm
-*.db-wal
-
-# Log files
-*.log
-home-assistant.log.*
-home-assistant_v2.db.*
-
-# Temporary files
-*.py[cod]
-*.so
-*.swp
-*~
-._*
-__pycache__
-.DS_Store
-coverage/
-
-# Configuration files that may contain sensitive information
-secrets.yaml
-known_devices.yaml
-ip_bans.yaml
-
-# Add-on files
-.addons
-.storage
-.cloud
-
-# Custom component cache
-custom_components/
-# Environment files
-.env
-.venv
-venv/
-ENV/
-
-# Backup files
-*.backup
-*.bak
-*.old
-*.tar
-*.gz
-
-# IDE specific files
-.idea/
-.vscode/
-*.sublime-workspace
-*.sublime-project
-
-.bash_history
-.zsh_history
-node_modules
-
-.github/
-
-# Python cache files
+# Python
 __pycache__/
-# Ignore __pycache__ directories with a depth of 2 to 5
-**/__pycache__
-**/**/__pycache__/
-**/**/**/__pycache__/
-**/**/**/**/__pycache__/
-**/**/**/**/**/__pycache__/
-
-
 *.py[cod]
 *$py.class
-
-# Distribution / packaging
-dist/
+*.so
+.Python
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
+.installed.cfg
+*.egg
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-coverage.xml
-*.cover
-
-# Development environment
+# Virtual Environment
 .env
 .venv
 venv/
 ENV/
 
-# IDE specific files
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 .DS_Store
 
-# Component specific
-*.log
-*.db
+# Testing
+.tox/
+.coverage
+.coverage.*
+.cache
+coverage.xml
+*.cover
+.pytest_cache/
+htmlcov/
 
-tasks
-effects/__pycache__/__init__.cpython-312.pyc
-tests/__pycache__/conftest.cpython-312-pytest-8.3.3.pyc
+# Home Assistant specific
+.storage
+.cloud
+.google.token
+.uuid
+.HA_VERSION
+*.db
+*.db-shm
+*.db-wal
+*.log
+home-assistant.log.*
+home-assistant_v2.db.*
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+
+# Project specific
+custom_components/**/__pycache__/
+custom_components/**/*.pyc
+custom_components/**/*.pyo
+custom_components/**/*.pyd
+
+# Test reports
+test-reports/
+coverage/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Operating System
+.DS_Store
+Thumbs.db

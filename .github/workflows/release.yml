@@ -1,0 +1,197 @@
+name: Release Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.1)'
+        required: true
+        type: string
+      release_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      prerelease:
+        description: 'Is this a pre-release?'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements_test.txt
+          npm ci
+      
+      - name: Run tests
+        run: |
+          npm run test
+          pytest tests/
+      
+      - name: Validate HACS
+        uses: hacs/action@main
+        with:
+          category: integration
+
+  prepare-release:
+    needs: validate
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Update version numbers
+        run: |
+          # Update version in manifest.json
+          jq '.version = "${{ github.event.inputs.version }}"' manifest.json > manifest.json.tmp
+          mv manifest.json.tmp manifest.json
+          
+          # Update version in package.json
+          npm version ${{ github.event.inputs.version }} --no-git-tag-version
+          
+          # Update version in pyproject.toml
+          sed -i "s/version = .*/version = \"${{ github.event.inputs.version }}\"/" pyproject.toml
+      
+      - name: Generate changelog
+        id: changelog
+        uses: heinrichreimer/github-changelog-generator-action@v2.3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          output: CHANGELOG.md
+          
+      - name: Create release branch
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git checkout -b release/v${{ github.event.inputs.version }}
+          git add .
+          git commit -m "Release v${{ github.event.inputs.version }}"
+          git push origin release/v${{ github.event.inputs.version }}
+      
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: "Release v${{ github.event.inputs.version }}"
+          body: |
+            # Release v${{ github.event.inputs.version }}
+            
+            ## Changelog
+            ${{ steps.changelog.outputs.changelog }}
+          branch: release/v${{ github.event.inputs.version }}
+          base: main
+          labels: release
+
+  build:
+    needs: prepare-release
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: release/v${{ github.event.inputs.version }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+      
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel
+          npm ci
+      
+      - name: Build frontend
+        run: |
+          npm run build
+      
+      - name: Build Python package
+        run: |
+          python -m build
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: |
+            dist/
+            frontend/dist/
+
+  publish:
+    needs: build
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: release/v${{ github.event.inputs.version }}
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: dist
+          path: dist
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: Release v${{ github.event.inputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: |
+            dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Merge release branch
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: "Merge release v${{ github.event.inputs.version }} back to develop"
+          body: "Merge release branch back to develop to continue development"
+          branch: release/v${{ github.event.inputs.version }}
+          base: develop
+          labels: release
+
+  cleanup:
+    needs: publish
+    name: Cleanup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Delete release branch
+        run: |
+          git push origin --delete release/v${{ github.event.inputs.version }} 

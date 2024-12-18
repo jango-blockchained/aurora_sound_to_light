@@ -1,4 +1,20 @@
 """Fixtures for Aurora Sound to Light integration tests."""
+import os
+import sys
+from pathlib import Path
+
+# Get the root directory of the project
+root_dir = Path(__file__).parent.parent.parent
+
+# Add the root directory to PYTHONPATH
+sys.path.insert(0, str(root_dir))
+
+# Add the parent directory of custom_components to PYTHONPATH
+parent_dir = root_dir.parent
+sys.path.insert(0, str(parent_dir))
+
+pytest_plugins = "pytest_homeassistant_custom_component"
+
 from unittest.mock import patch
 import pytest
 

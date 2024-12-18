@@ -3,9 +3,9 @@ import { esbuildPlugin } from '@web/dev-server-esbuild';
 
 export default {
   files: [
-    'tests/frontend/unit/**/*.test.js',
-    'tests/frontend/integration/**/*.test.js',
-    'tests/frontend/e2e/**/*.test.js'
+    'frontend/tests/unit/**/*.test.js',
+    'frontend/tests/integration/**/*.test.js',
+    'frontend/tests/e2e/**/*.test.js'
   ],
   nodeResolve: true,
   plugins: [

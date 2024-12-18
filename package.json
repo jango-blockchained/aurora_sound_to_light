@@ -12,7 +12,7 @@
         "test:frontend:watch": "web-test-runner \"tests/frontend/**/*.test.js\" --node-resolve --watch",
         "test:frontend:coverage": "web-test-runner \"tests/frontend/**/*.test.js\" --node-resolve --coverage",
         "test:python": "pytest tests/",
-        "test:python:coverage": "pytest tests/ --cov=custom_components/aurora_sound_to_light --cov-report=html",
+        "test:python:coverage": "pytest tests/ --cov=. --cov-report=html",
         "lint": "eslint frontend/ tests/frontend/"
     },
     "devDependencies": {
