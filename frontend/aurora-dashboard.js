@@ -2,7 +2,7 @@ import {
     LitElement,
     html,
     css,
-} from "https://unpkg.com/lit-element@2.4.0/lit-element.js?module";
+} from "https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js";
 
 // Constants
 const BREAKPOINT_MOBILE = 768;
@@ -250,5 +250,262 @@ class AuroraDashboard extends LitElement {
         }
     }
 
-    // ... rest of the code stays the same ...
-} 
+    static get styles() {
+        return css`
+            :host {
+                display: block;
+                padding: 16px;
+            }
+
+            .dashboard-container {
+                display: grid;
+                gap: 16px;
+            }
+
+            .dashboard-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 16px;
+            }
+
+            .dashboard-title {
+                font-size: 1.5em;
+                font-weight: 500;
+                color: var(--primary-text-color);
+            }
+
+            .dashboard-status {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .dashboard-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 16px;
+            }
+
+            .dashboard-card {
+                background: var(--card-background-color, #fff);
+                border-radius: var(--ha-card-border-radius, 4px);
+                box-shadow: var(--ha-card-box-shadow, 0 2px 2px rgba(0, 0, 0, 0.1));
+                overflow: hidden;
+            }
+
+            .card-header {
+                padding: 16px;
+                border-bottom: 1px solid var(--divider-color);
+                font-weight: 500;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .card-content {
+                padding: 16px;
+            }
+
+            .metrics-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 16px;
+            }
+
+            .metric-item {
+                text-align: center;
+                padding: 8px;
+            }
+
+            .metric-value {
+                font-size: 1.5em;
+                font-weight: 500;
+                color: var(--primary-color);
+            }
+
+            .metric-label {
+                font-size: 0.9em;
+                color: var(--secondary-text-color);
+            }
+
+            .error-message {
+                background: var(--error-color);
+                color: white;
+                padding: 16px;
+                border-radius: 4px;
+                margin-bottom: 16px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .connection-status {
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 0.9em;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+
+            .connection-status.connected {
+                color: var(--success-color);
+            }
+
+            .connection-status.disconnected {
+                color: var(--error-color);
+            }
+
+            @media (max-width: ${BREAKPOINT_MOBILE}px) {
+                .dashboard-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+        `;
+    }
+
+    render() {
+        if (!this.hass) return html`<div>Loading...</div>`;
+
+        if (this._error) {
+            return html`
+                <div class="error-message">
+                    <span class="material-symbols-rounded">error</span>
+                    ${this._error}
+                </div>
+            `;
+        }
+
+        return html`
+            <div class="dashboard-container">
+                <div class="dashboard-header">
+                    <div class="dashboard-title">Aurora Sound to Light</div>
+                    <div class="dashboard-status">
+                        ${this._connected ? html`
+                            <div class="connection-status connected">
+                                <span class="material-symbols-rounded">check_circle</span>
+                                Connected
+                            </div>
+                        ` : html`
+                            <div class="connection-status disconnected">
+                                <span class="material-symbols-rounded">error</span>
+                                Disconnected
+                            </div>
+                        `}
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- Media Controls Card -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <span>Media Controls</span>
+                        </div>
+                        <div class="card-content">
+                            <aurora-media-controls
+                                .hass=${this.hass}
+                                @audio-update=${this._handleAudioUpdate}
+                                @media-control=${this._handleMediaControl}
+                            ></aurora-media-controls>
+                        </div>
+                    </div>
+
+                    <!-- Visualizer Card -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <span>Audio Visualization</span>
+                        </div>
+                        <div class="card-content">
+                            <aurora-visualizer
+                                .hass=${this.hass}
+                                mode="frequency"
+                                ?isActive=${this._state.audioState.isPlaying}
+                            ></aurora-visualizer>
+                        </div>
+                    </div>
+
+                    <!-- Effect Selector Card -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <span>Light Effects</span>
+                        </div>
+                        <div class="card-content">
+                            <aurora-effect-selector
+                                .hass=${this.hass}
+                                @effect-change=${this._handleEffectChange}
+                            ></aurora-effect-selector>
+                        </div>
+                    </div>
+
+                    <!-- Group Manager Card -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <span>Light Groups</span>
+                        </div>
+                        <div class="card-content">
+                            <aurora-group-manager
+                                .hass=${this.hass}
+                                @group-update=${this._handleGroupUpdate}
+                            ></aurora-group-manager>
+                        </div>
+                    </div>
+
+                    <!-- Performance Metrics Card -->
+                    ${this._config?.show_metrics ? html`
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <span>Performance Metrics</span>
+                            </div>
+                            <div class="card-content">
+                                <div class="metrics-grid">
+                                    <div class="metric-item">
+                                        <div class="metric-value">${this._state.metrics?.fps || 0}</div>
+                                        <div class="metric-label">FPS</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <div class="metric-value">${this._state.metrics?.latency || 0}ms</div>
+                                        <div class="metric-label">Latency</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <div class="metric-value">${this._state.metrics?.cpu_usage || 0}%</div>
+                                        <div class="metric-label">CPU Usage</div>
+                                    </div>
+                                    <div class="metric-item">
+                                        <div class="metric-value">${this._state.metrics?.memory_usage || 0}MB</div>
+                                        <div class="metric-label">Memory Usage</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    // WebSocket Event Handlers
+    _handleStateUpdate(message) {
+        this._updateState({
+            audioState: message.audio_state || this._state.audioState,
+            effectState: message.effect_state || this._state.effectState,
+            groupState: message.group_state || this._state.groupState
+        });
+    }
+
+    _handleMetricsUpdate(message) {
+        this._updateState({
+            metrics: message.metrics || {}
+        });
+    }
+
+    // Cleanup
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        window.removeEventListener('resize', this._handleResize);
+        document.removeEventListener('visibilitychange', this._handleVisibilityChange);
+        this._persistState();
+    }
+}
+
+customElements.define('aurora-dashboard', AuroraDashboard); 
