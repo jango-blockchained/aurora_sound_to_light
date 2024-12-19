@@ -7,7 +7,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
-from .audio_processor import AudioProcessor
+from .core.audio_processor import AudioProcessor
 from .core.light_controller import LightController
 from .core.effect_engine import EffectEngine
 from .services import async_register_services

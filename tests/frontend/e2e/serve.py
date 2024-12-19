@@ -6,7 +6,7 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         if path.endswith('.js'):
             return 'application/javascript; charset=utf-8'
         return super().guess_type(path)
-    
+
     def end_headers(self):
         # Add CORS headers
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -17,11 +17,12 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Expires', '0')
         super().end_headers()
 
-    def do_OPTIONS(self):
+    def do_OPTIONS(self) -> None:
         self.send_response(200)
         self.end_headers()
 
-PORT = 8000
+
+PORT = 8001
 Handler = CustomHTTPRequestHandler
 
 print(f"Starting server at http://localhost:{PORT}")
