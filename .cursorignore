@@ -31,3 +31,6 @@ custom_components/**/__pycache__/
 custom_components/**/*.pyc
 custom_components/**/*.pyo
 custom_components/**/*.pyd 
+
+# Unnecessary files
+custom_components/

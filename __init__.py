@@ -1,16 +1,14 @@
 """The Aurora Sound to Light integration."""
 import logging
 import sys
-from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.components import frontend
 
 from .const import DOMAIN
 from .audio_processor import AudioProcessor
-from .light_controller import LightController
+from .core.light_controller import LightController
 from .core.effect_engine import EffectEngine
 from .services import async_register_services
 from .cache import AuroraCache
@@ -19,6 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.LIGHT, Platform.SENSOR]
 MODULE_URL = "/local/aurora_sound_to_light/aurora-dashboard.js"
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Aurora Sound to Light from a config entry."""
@@ -64,7 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     try:
-        unload_ok = await hass.config_entries.async_unload_platforms(
+        unload_ok: bool = await hass.config_entries.async_unload_platforms(
             entry,
             PLATFORMS
         )

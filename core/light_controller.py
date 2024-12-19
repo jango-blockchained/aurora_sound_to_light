@@ -9,7 +9,7 @@ from homeassistant.components.light import (
 )
 from homeassistant.core import HomeAssistant
 
-from .effects import EffectEngine
+from ..effects import EffectEngine
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class LightController:
         """Start a light effect."""
         try:
             if self._effect_engine is None:
-                from .effects import get_effect_engine
+                from ..effects import get_effect_engine
                 self._effect_engine = await get_effect_engine(self.hass)
 
             if self._current_effect:
@@ -110,4 +110,4 @@ class LightController:
 
     async def get_light_state(self, light_id: str) -> Optional[Dict[str, Any]]:
         """Get the current state of a light."""
-        return self._lights.get(light_id)
+        return self._lights.get(light_id) 
